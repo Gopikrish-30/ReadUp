@@ -85,10 +85,10 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   const [activeColor, setActiveColor] = useState("#ffff00") // Yellow for highlights
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
-  const [scale, setScale] = useState(1.0) // Start with normal scale
+  const [scale, setScale] = useState(1.0)
   const [originalScale, setOriginalScale] = useState(1.0)
   const [fitToScreen, setFitToScreen] = useState(false)
-  const [fitPercentage, setFitPercentage] = useState(90) // Better fit percentage
+  const [fitPercentage, setFitPercentage] = useState(90)
   const [showFitInput, setShowFitInput] = useState(false)
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [noteText, setNoteText] = useState("")
@@ -265,7 +265,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     if (!containerRef.current || !pdfPageRef.current) return scale
 
     const sidebarWidth = activeTool === "highlighter" || activeTool === "pen" ? 28 : 16
-    const availableWidth = window.innerWidth - sidebarWidth - 80 // More padding
+    const availableWidth = window.innerWidth - sidebarWidth - 80
 
     const pageElement = pdfPageRef.current.querySelector(".react-pdf__Page")
     if (!pageElement) return scale
@@ -717,64 +717,68 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   // Show loading state
   if (!isReady || isLoading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-16 h-16 text-gray-400 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600">
-            {!isReady ? "Initializing PDF storage..." : "Loading PDF..."}
-          </p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center bg-white rounded-2xl shadow-xl p-12 border border-slate-200">
+          <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <Loader2 className="w-8 h-8 text-white animate-spin" />
+          </div>
+          <h3 className="text-xl font-semibold text-slate-800 mb-2">
+            {!isReady ? "Initializing PDF storage..." : "Loading your book..."}
+          </h3>
+          <p className="text-slate-600">Please wait while we prepare your reading experience</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="h-screen bg-white text-gray-900 flex flex-col overflow-hidden">
-      {/* Top Bar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="sm" onClick={() => router.back()}>
+    <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col overflow-hidden">
+      {/* Modern Top Bar */}
+      <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 px-6 py-3 flex items-center justify-between flex-shrink-0 shadow-sm">
+        <div className="flex items-center space-x-6">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => router.back()}
+            className="text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all duration-200"
+          >
             <X className="w-5 h-5 mr-2" />
             Exit Reader
           </Button>
 
           {bookData?.title && (
-            <span className="text-sm font-medium text-gray-600 hidden md:inline">
-              {bookData.title}
-            </span>
-          )}
-
-          {activeTool && (
-            <div className="flex items-center space-x-2 bg-indigo-100 px-3 py-1 rounded-full">
-              <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
-              <span className="text-sm font-medium text-indigo-700 capitalize">
-                {activeTool} active
-              </span>
+            <div className="hidden md:flex items-center space-x-3">
+              <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+              <span className="text-sm font-medium text-slate-700">{bookData.title}</span>
             </div>
           )}
 
-          {selectedText && (
-            <div className="flex items-center space-x-2 bg-yellow-100 px-3 py-1 rounded-full">
-              <span className="text-sm font-medium text-yellow-700">
-                "{selectedText.substring(0, 30)}
-                {selectedText.length > 30 ? "..." : ""}" selected
-              </span>
-            </div>
-          )}
+          {/* Status Indicators */}
+          <div className="flex items-center space-x-3">
+            {activeTool && (
+              <div className="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-2 rounded-full shadow-lg">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium capitalize">{activeTool} mode</span>
+              </div>
+            )}
 
-          <div className="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full">
-            <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
-            <span className="text-sm font-medium text-gray-700 capitalize">light mode</span>
+            {selectedText && (
+              <div className="flex items-center space-x-2 bg-gradient-to-r from-amber-400 to-orange-500 text-white px-4 py-2 rounded-full shadow-lg">
+                <span className="text-sm font-medium">
+                  "{selectedText.substring(0, 25)}{selectedText.length > 25 ? "..." : ""}" selected
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-6">
           {/* Page Navigation */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3 bg-white rounded-2xl px-4 py-2 shadow-lg border border-slate-200">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 rounded-xl hover:bg-slate-100"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage <= 1}
             >
@@ -786,17 +790,17 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                 type="number"
                 value={currentPage}
                 onChange={(e) => handlePageChange(Number.parseInt(e.target.value) || 1)}
-                className="w-16 h-8 text-center text-sm"
+                className="w-16 h-8 text-center text-sm border-0 bg-slate-50 rounded-lg focus:bg-white transition-colors"
                 min={1}
                 max={totalPages}
               />
-              <span className="text-sm text-gray-500">of {totalPages}</span>
+              <span className="text-sm text-slate-500 font-medium">of {totalPages}</span>
             </div>
 
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 rounded-xl hover:bg-slate-100"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage >= totalPages}
             >
@@ -804,9 +808,14 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
             </Button>
           </div>
 
-          {/* Zoom Control */}
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleZoomChange(scale - 0.1)}>
+          {/* Zoom Controls */}
+          <div className="flex items-center space-x-3 bg-white rounded-2xl px-4 py-2 shadow-lg border border-slate-200">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 rounded-xl hover:bg-slate-100" 
+              onClick={() => handleZoomChange(scale - 0.1)}
+            >
               <ZoomOut className="w-4 h-4" />
             </Button>
 
@@ -820,17 +829,21 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               disabled={fitToScreen}
             />
 
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleZoomChange(scale + 0.1)}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 rounded-xl hover:bg-slate-100" 
+              onClick={() => handleZoomChange(scale + 0.1)}
+            >
               <ZoomIn className="w-4 h-4" />
             </Button>
 
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-2">
               <Button
-                variant={fitToScreen ? "secondary" : "ghost"}
+                variant={fitToScreen ? "default" : "ghost"}
                 size="sm"
                 onClick={toggleFitToScreen}
-                className="text-xs"
-                title={fitToScreen ? "Exit fit mode" : "Fit to screen width"}
+                className="text-xs rounded-xl"
               >
                 {fitToScreen ? "Exit Fit" : "Fit Width"}
               </Button>
@@ -838,33 +851,39 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-xl hover:bg-slate-100"
                 onClick={() => setShowFitInput(!showFitInput)}
-                title="Adjust fit percentage"
               >
                 <Settings className="w-4 h-4" />
               </Button>
             </div>
 
-            <span className="text-sm font-medium">{Math.round(scale * 100)}%</span>
+            <span className="text-sm font-medium text-slate-700 min-w-[3rem] text-center">
+              {Math.round(scale * 100)}%
+            </span>
           </div>
         </div>
       </div>
 
       {/* Fit Percentage Input */}
       {showFitInput && (
-        <div className="bg-white border-b px-4 py-2 flex items-center justify-center space-x-4">
-          <span className="text-sm text-gray-600">Fit Percentage:</span>
+        <div className="bg-white/90 backdrop-blur-xl border-b border-slate-200/60 px-6 py-3 flex items-center justify-center space-x-4 shadow-sm">
+          <span className="text-sm text-slate-600 font-medium">Fit Percentage:</span>
           <Input
             type="number"
             value={fitPercentage}
             onChange={(e) => handleFitPercentageChange(Number.parseInt(e.target.value) || 90)}
-            className="w-20 h-8 text-center text-sm"
+            className="w-20 h-8 text-center text-sm rounded-xl border-slate-200"
             min={50}
             max={100}
           />
-          <span className="text-sm text-gray-500">%</span>
-          <Button size="sm" variant="ghost" onClick={() => setShowFitInput(false)}>
+          <span className="text-sm text-slate-500">%</span>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={() => setShowFitInput(false)}
+            className="rounded-xl"
+          >
             Done
           </Button>
         </div>
@@ -872,120 +891,153 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
-        <div className="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4 space-y-6 flex-shrink-0">
-          <Button
-            variant={activeTool === "highlighter" ? "secondary" : "ghost"}
-            size="icon"
-            className="rounded-full"
-            onClick={() => handleToolClick("highlighter")}
-            title="Text Highlighter (H) - Select text to highlight"
-          >
-            <Highlighter className="h-5 w-5" />
-          </Button>
+        {/* Modern Floating Sidebar */}
+        <div className="absolute left-6 top-1/2 transform -translate-y-1/2 z-50">
+          <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-200/60 p-3 flex flex-col space-y-4">
+            {/* Tool Buttons */}
+            <Button
+              variant={activeTool === "highlighter" ? "default" : "ghost"}
+              size="icon"
+              className={`w-12 h-12 rounded-2xl transition-all duration-200 ${
+                activeTool === "highlighter" 
+                  ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg scale-110" 
+                  : "hover:bg-slate-100 hover:scale-105"
+              }`}
+              onClick={() => handleToolClick("highlighter")}
+              title="Text Highlighter (H)"
+            >
+              <Highlighter className="h-5 w-5" />
+            </Button>
 
-          <Button
-            variant={activeTool === "pen" ? "secondary" : "ghost"}
-            size="icon"
-            className="rounded-full"
-            onClick={() => handleToolClick("pen")}
-            title="Drawing Pen (P)"
-          >
-            <Pencil className="h-5 w-5" />
-          </Button>
+            <Button
+              variant={activeTool === "pen" ? "default" : "ghost"}
+              size="icon"
+              className={`w-12 h-12 rounded-2xl transition-all duration-200 ${
+                activeTool === "pen" 
+                  ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg scale-110" 
+                  : "hover:bg-slate-100 hover:scale-105"
+              }`}
+              onClick={() => handleToolClick("pen")}
+              title="Drawing Pen (P)"
+            >
+              <Pencil className="h-5 w-5" />
+            </Button>
 
-          <Button
-            variant={activeTool === "eraser" ? "secondary" : "ghost"}
-            size="icon"
-            className="rounded-full"
-            onClick={() => handleToolClick("eraser")}
-            title="Eraser (E)"
-          >
-            <Eraser className="h-5 w-5" />
-          </Button>
+            <Button
+              variant={activeTool === "eraser" ? "default" : "ghost"}
+              size="icon"
+              className={`w-12 h-12 rounded-2xl transition-all duration-200 ${
+                activeTool === "eraser" 
+                  ? "bg-gradient-to-r from-red-500 to-pink-600 text-white shadow-lg scale-110" 
+                  : "hover:bg-slate-100 hover:scale-105"
+              }`}
+              onClick={() => handleToolClick("eraser")}
+              title="Eraser (E)"
+            >
+              <Eraser className="h-5 w-5" />
+            </Button>
 
-          <Button
-            variant={activeTool === "note" ? "secondary" : "ghost"}
-            size="icon"
-            className="rounded-full"
-            onClick={() => handleToolClick("note")}
-            title="Add Note (N)"
-          >
-            <StickyNote className="h-5 w-5" />
-          </Button>
+            <Button
+              variant={activeTool === "note" ? "default" : "ghost"}
+              size="icon"
+              className={`w-12 h-12 rounded-2xl transition-all duration-200 ${
+                activeTool === "note" 
+                  ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg scale-110" 
+                  : "hover:bg-slate-100 hover:scale-105"
+              }`}
+              onClick={() => handleToolClick("note")}
+              title="Add Note (N)"
+            >
+              <StickyNote className="h-5 w-5" />
+            </Button>
 
-          <div className="border-t border-gray-200 w-8 my-2"></div>
+            {/* Divider */}
+            <div className="w-8 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent mx-auto"></div>
 
-          <Button variant="ghost" size="icon" className="rounded-full" onClick={handleBookmarkClick} title="Bookmark">
-            <BookmarkIcon className="h-5 w-5" />
-          </Button>
+            {/* Action Buttons */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="w-12 h-12 rounded-2xl hover:bg-slate-100 hover:scale-105 transition-all duration-200" 
+              onClick={handleBookmarkClick} 
+              title="Bookmark"
+            >
+              <BookmarkIcon className="h-5 w-5 text-purple-600" />
+            </Button>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full"
-            onClick={handleCreateFlashcard}
-            title="Create Flashcard from Selection"
-          >
-            <BrainCircuit className="h-5 w-5" />
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-12 h-12 rounded-2xl hover:bg-slate-100 hover:scale-105 transition-all duration-200"
+              onClick={handleCreateFlashcard}
+              title="Create Flashcard"
+            >
+              <BrainCircuit className="h-5 w-5 text-emerald-600" />
+            </Button>
 
-          <div className="border-t border-gray-200 w-8 my-2"></div>
+            {/* Divider */}
+            <div className="w-8 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent mx-auto"></div>
 
-          <Button
-            variant="secondary"
-            size="icon"
-            className="rounded-full"
-            title="Light Mode (Always Active)"
-            disabled
-          >
-            <Sun className="h-5 w-5" />
-          </Button>
+            {/* Light Mode Indicator */}
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg">
+              <Sun className="h-5 w-5 text-white" />
+            </div>
+          </div>
         </div>
 
         {/* Color Palette */}
         {(activeTool === "highlighter" || activeTool === "pen") && (
-          <div className="w-12 bg-white border-r border-gray-200 flex flex-col items-center py-4 space-y-2 flex-shrink-0">
-            {colors.map((color) => (
-              <button
-                key={color}
-                className={`w-8 h-8 rounded-full border-2 transition-all ${
-                  activeColor === color
-                    ? "border-gray-800 scale-110"
-                    : "border-gray-300 hover:scale-105"
-                }`}
-                style={{ backgroundColor: color }}
-                onClick={() => setActiveColor(color)}
-                title={`Select ${color}`}
-              />
-            ))}
+          <div className="absolute left-24 top-1/2 transform -translate-y-1/2 z-40">
+            <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-200/60 p-3 flex flex-col space-y-3">
+              {colors.map((color) => (
+                <button
+                  key={color}
+                  className={`w-10 h-10 rounded-2xl border-3 transition-all duration-200 ${
+                    activeColor === color
+                      ? "border-slate-800 scale-110 shadow-lg"
+                      : "border-slate-200 hover:scale-105 hover:border-slate-400"
+                  }`}
+                  style={{ backgroundColor: color }}
+                  onClick={() => setActiveColor(color)}
+                  title={`Select ${color}`}
+                />
+              ))}
+            </div>
           </div>
         )}
 
-        {/* PDF Viewer with constrained height and proper scrolling */}
+        {/* PDF Viewer */}
         <div
           ref={containerRef}
-          className="flex-1 bg-gray-50 overflow-auto"
+          className="flex-1 overflow-auto"
           style={{ 
-            height: 'calc(100vh - 64px)', // Subtract header height
-            maxHeight: 'calc(100vh - 64px)' // Ensure it doesn't exceed viewport
+            height: 'calc(100vh - 80px)',
+            maxHeight: 'calc(100vh - 80px)'
           }}
         >
           {pdfError ? (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center p-8 max-w-md">
-                <AlertCircle className="w-16 h-16 text-orange-400 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2 text-orange-600">PDF Not Available</h2>
-                <p className="text-gray-600 mb-6">{pdfError}</p>
+              <div className="text-center p-8 max-w-md bg-white rounded-3xl shadow-xl border border-slate-200">
+                <div className="w-16 h-16 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <AlertCircle className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-xl font-semibold mb-3 text-slate-800">PDF Not Available</h2>
+                <p className="text-slate-600 mb-6">{pdfError}</p>
+                <Button 
+                  onClick={() => router.back()}
+                  className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl"
+                >
+                  Go Back
+                </Button>
               </div>
             </div>
           ) : pdfUrl ? (
-            <div className="flex justify-center py-6 px-4">
+            <div className="flex justify-center py-8 px-6">
               <div className="relative" ref={pageContainerRef}>
                 {activeTool === "highlighter" && (
-                  <div className="absolute -top-8 left-0 right-0 text-center z-20">
-                    <div className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                      Select text to highlight it
+                  <div className="absolute -top-12 left-0 right-0 text-center z-20">
+                    <div className="inline-block bg-gradient-to-r from-amber-400 to-yellow-500 text-white px-6 py-2 rounded-full text-sm font-medium shadow-lg">
+                      ✨ Select text to highlight it
                     </div>
                   </div>
                 )}
@@ -996,8 +1048,13 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
                     loading={
-                      <div className="flex items-center justify-center p-8">
-                        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                      <div className="flex items-center justify-center p-12 bg-white rounded-3xl shadow-xl border border-slate-200">
+                        <div className="text-center">
+                          <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <Loader2 className="w-8 h-8 text-white animate-spin" />
+                          </div>
+                          <p className="text-slate-600 font-medium">Loading your book...</p>
+                        </div>
                       </div>
                     }
                   >
@@ -1008,14 +1065,14 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                       onRenderSuccess={onPageRenderSuccess}
                       renderTextLayer={true}
                       renderAnnotationLayer={false}
-                      className="shadow-lg border border-gray-200 rounded-lg"
+                      className="shadow-2xl border border-slate-200 rounded-2xl overflow-hidden bg-white"
                     />
                   </Document>
 
-                  {/* Overlay Canvas positioned absolutely over the PDF */}
+                  {/* Overlay Canvas */}
                   <canvas
                     ref={overlayCanvasRef}
-                    className="absolute top-0 left-0 pointer-events-none"
+                    className="absolute top-0 left-0 pointer-events-none rounded-2xl"
                     style={{
                       pointerEvents: activeTool && activeTool !== "highlighter" ? "auto" : "none",
                       cursor: activeTool === "eraser" ? "grab" : activeTool === "pen" ? "crosshair" : "default",
@@ -1025,13 +1082,13 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                     onMouseUp={handleMouseUp}
                   />
 
-                  {/* Notes positioned absolutely */}
+                  {/* Notes */}
                   {annotations.notes
                     .filter((note) => note.page === currentPage)
                     .map((note) => (
                       <div
                         key={note.id}
-                        className="absolute w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold text-white cursor-pointer shadow-lg hover:scale-110 transition-transform z-10"
+                        className="absolute w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-sm font-bold text-white cursor-pointer shadow-xl hover:scale-110 transition-transform z-10 border-2 border-white"
                         style={{ left: note.position.x, top: note.position.y }}
                         title={note.text}
                       >
@@ -1043,36 +1100,50 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
             </div>
           ) : (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">No PDF Loaded</h2>
-                <p className="text-gray-500">Please upload a PDF file to start reading</p>
+              <div className="text-center bg-white rounded-3xl shadow-xl border border-slate-200 p-12">
+                <div className="w-16 h-16 bg-gradient-to-r from-slate-400 to-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <BookOpen className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-xl font-semibold mb-3 text-slate-800">No PDF Loaded</h2>
+                <p className="text-slate-600">Please upload a PDF file to start reading</p>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Note Input */}
+      {/* Modern Note Input */}
       {isAddingNote && (
         <div
-          className="absolute bg-yellow-100 border-yellow-300 p-3 rounded-md shadow-lg w-64 z-40"
-          style={{ left: `${notePosition.x + 80}px`, top: `${notePosition.y + 60}px` }}
+          className="absolute bg-white/95 backdrop-blur-xl border border-slate-200 rounded-3xl shadow-2xl w-80 z-50 p-6"
+          style={{ left: `${notePosition.x + 100}px`, top: `${notePosition.y + 80}px` }}
         >
-          <Textarea
-            className="w-full h-24 p-2 text-sm bg-transparent border rounded resize-none border-yellow-300"
-            placeholder="Add your note here..."
-            value={noteText}
-            onChange={(e) => setNoteText(e.target.value)}
-            autoFocus
-          />
-          <div className="flex justify-end mt-2 space-x-2">
-            <Button size="sm" variant="ghost" onClick={() => setIsAddingNote(false)}>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-slate-800 mb-2">Add Note</h3>
+            <Textarea
+              className="w-full h-32 p-4 text-sm bg-slate-50 border-slate-200 rounded-2xl resize-none focus:bg-white transition-colors"
+              placeholder="Write your note here..."
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end space-x-3">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={() => setIsAddingNote(false)}
+              className="rounded-xl"
+            >
               Cancel
             </Button>
-            <Button size="sm" onClick={handleNoteSave}>
-              <Save className="w-4 h-4 mr-1" />
-              Save
+            <Button 
+              size="sm" 
+              onClick={handleNoteSave}
+              className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save Note
             </Button>
           </div>
         </div>
