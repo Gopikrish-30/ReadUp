@@ -1077,33 +1077,6 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
           </div>
         </div>
       )}
-
-      {/* Keyboard shortcuts help */}
-      <div className="fixed bottom-4 right-4 bg-black/70 text-white text-xs p-2 rounded opacity-50 hover:opacity-100 transition-all duration-300">
-        <div>← → : Navigate pages</div>
-        <div>H : Text Highlighter</div>
-        <div>P : Drawing Pen</div>
-        <div>N : Add Note</div>
-        <div>E : Eraser</div>
-        <div>F : Toggle fit to width</div>
-        <div>ESC : Deselect tool</div>
-      </div>
-
-      {/* Annotations count */}
-      <div className="fixed bottom-4 left-4 bg-black/70 text-white text-xs p-2 rounded">
-        <div>
-          Page {currentPage}: {annotations.highlights.filter((h) => h.page === currentPage).length} highlights,{" "}
-          {annotations.drawings.filter((d) => d.page === currentPage).length} drawings,{" "}
-          {annotations.notes.filter((n) => n.page === currentPage).length} notes
-        </div>
-        {selectedText && (
-          <div className="mt-1 text-yellow-300">
-            Selected: "{selectedText.substring(0, 20)}
-            {selectedText.length > 20 ? "..." : ""}"
-          </div>
-        )}
-        {fitToScreen && <div className="mt-1 text-green-300">Fit Mode: {fitPercentage}% width</div>}
-      </div>
     </div>
   )
 }
