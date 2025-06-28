@@ -225,7 +225,8 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   // Handle page render success
   const onPageRenderSuccess = () => {
     console.log(`Page ${currentPage} rendered successfully`)
-    setTimeout(() => renderAnnotations(), 100)
+    // Small delay to ensure page is fully rendered before adding annotations
+    setTimeout(() => renderAnnotations(), 150)
   }
 
   // Calculate scale to fit PDF to screen width
@@ -233,7 +234,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     if (!containerRef.current || !pdfPageRef.current) return scale
 
     const sidebarWidth = activeTool === "highlighter" || activeTool === "pen" ? 28 : 16
-    const availableWidth = window.innerWidth - sidebarWidth - 32
+    const availableWidth = window.innerWidth - sidebarWidth - 64 // Extra padding
 
     const pageElement = pdfPageRef.current.querySelector(".react-pdf__Page")
     if (!pageElement) return scale
@@ -252,7 +253,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
         setScale(newScale)
       }
 
-      const timeoutId = setTimeout(handleResize, 200)
+      const timeoutId = setTimeout(handleResize, 300)
       window.addEventListener("resize", handleResize)
       return () => {
         clearTimeout(timeoutId)
@@ -350,11 +351,17 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     if (!pageElement) return
 
     const pageRect = pageElement.getBoundingClientRect()
+    const containerRect = pageContainerRef.current.getBoundingClientRect()
 
+    // Set canvas size to match the PDF page exactly
     canvas.width = pageRect.width
     canvas.height = pageRect.height
     canvas.style.width = pageRect.width + "px"
     canvas.style.height = pageRect.height + "px"
+    
+    // Position canvas to overlay the PDF page
+    canvas.style.left = (pageRect.left - containerRect.left) + "px"
+    canvas.style.top = (pageRect.top - containerRect.top) + "px"
 
     context.clearRect(0, 0, canvas.width, canvas.height)
 
@@ -483,7 +490,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
   useEffect(() => {
     renderAnnotations()
-  }, [annotations, currentPage, renderAnnotations])
+  }, [annotations, currentPage, renderAnnotations, scale])
 
   // Handle note save
   const handleNoteSave = () => {
@@ -937,64 +944,63 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               </div>
             </div>
           ) : pdfUrl ? (
-            <div className="flex justify-center">
-              <div className="bg-gray-50 p-4 rounded-lg transition-colors duration-300">
-                <div className="relative" ref={pageContainerRef}>
-                  {activeTool === "highlighter" && (
-                    <div className="absolute -top-8 left-0 right-0 text-center z-20">
-                      <div className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                        Select text to highlight it
-                      </div>
+            <div className="flex justify-center p-4">
+              <div className="relative" ref={pageContainerRef}>
+                {activeTool === "highlighter" && (
+                  <div className="absolute -top-8 left-0 right-0 text-center z-20">
+                    <div className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                      Select text to highlight it
                     </div>
-                  )}
-
-                  <div ref={pdfPageRef} className="pdf-page-container">
-                    <Document
-                      file={pdfUrl}
-                      onLoadSuccess={onDocumentLoadSuccess}
-                      onLoadError={onDocumentLoadError}
-                      loading={
-                        <div className="flex items-center justify-center p-8">
-                          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-                        </div>
-                      }
-                    >
-                      <Page
-                        pageNumber={currentPage}
-                        scale={scale}
-                        onRenderSuccess={onPageRenderSuccess}
-                        renderTextLayer={true}
-                        renderAnnotationLayer={false}
-                        className="shadow-lg border border-gray-200 rounded-lg transition-all duration-300"
-                      />
-                    </Document>
                   </div>
+                )}
 
-                  <canvas
-                    ref={overlayCanvasRef}
-                    className="absolute top-0 left-0 pointer-events-none"
-                    style={{
-                      pointerEvents: activeTool && activeTool !== "highlighter" ? "auto" : "none",
-                      cursor: activeTool === "eraser" ? "grab" : activeTool === "pen" ? "crosshair" : "default",
-                    }}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                  />
-
-                  {annotations.notes
-                    .filter((note) => note.page === currentPage)
-                    .map((note) => (
-                      <div
-                        key={note.id}
-                        className="absolute w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold text-white cursor-pointer shadow-lg hover:scale-110 transition-transform"
-                        style={{ left: note.position.x, top: note.position.y }}
-                        title={note.text}
-                      >
-                        📝
+                <div ref={pdfPageRef} className="pdf-page-container">
+                  <Document
+                    file={pdfUrl}
+                    onLoadSuccess={onDocumentLoadSuccess}
+                    onLoadError={onDocumentLoadError}
+                    loading={
+                      <div className="flex items-center justify-center p-8">
+                        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
                       </div>
-                    ))}
+                    }
+                  >
+                    <Page
+                      key={`page_${currentPage}_${scale}`}
+                      pageNumber={currentPage}
+                      scale={scale}
+                      onRenderSuccess={onPageRenderSuccess}
+                      renderTextLayer={true}
+                      renderAnnotationLayer={false}
+                      className="shadow-lg border border-gray-200 rounded-lg transition-all duration-300"
+                    />
+                  </Document>
                 </div>
+
+                <canvas
+                  ref={overlayCanvasRef}
+                  className="absolute pointer-events-none"
+                  style={{
+                    pointerEvents: activeTool && activeTool !== "highlighter" ? "auto" : "none",
+                    cursor: activeTool === "eraser" ? "grab" : activeTool === "pen" ? "crosshair" : "default",
+                  }}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                />
+
+                {annotations.notes
+                  .filter((note) => note.page === currentPage)
+                  .map((note) => (
+                    <div
+                      key={note.id}
+                      className="absolute w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold text-white cursor-pointer shadow-lg hover:scale-110 transition-transform"
+                      style={{ left: note.position.x, top: note.position.y }}
+                      title={note.text}
+                    >
+                      📝
+                    </div>
+                  ))}
               </div>
             </div>
           ) : (
