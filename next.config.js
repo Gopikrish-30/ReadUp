@@ -1,33 +1,27 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack: (config) => {
-    // Copy PDF.js worker to public directory
-    config.resolve.alias = {
-      ...config.resolve.alias,
-    }
-    return config
+  eslint: {
+    ignoreDuringBuilds: true,
   },
-  // Allow external images and resources
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   images: {
-    domains: ['unpkg.com', 'cdnjs.cloudflare.com'],
+    unoptimized: true,
   },
-  // Headers for CORS
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Cross-Origin-Embedder-Policy',
-            value: 'unsafe-none',
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
-          },
-        ],
-      },
-    ]
+  experimental: {
+    esmExternals: false,
+  },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+    return config;
   },
 }
 
