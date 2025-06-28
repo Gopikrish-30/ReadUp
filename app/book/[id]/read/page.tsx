@@ -28,9 +28,9 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { usePdfStorage } from "@/hooks/use-pdf-storage"
 
-// Set up PDF.js worker
+// Set up PDF.js worker - use local worker file
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 }
 
 interface Note {
