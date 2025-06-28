@@ -12,6 +12,8 @@ import {
   StickyNote,
   BookmarkIcon,
   Sun,
+  Moon,
+  Lightbulb,
   BookOpen,
   X,
   ChevronLeft,
@@ -72,6 +74,8 @@ interface Annotation {
   bookmarks: Bookmark[]
 }
 
+type ReadingMode = "light" | "dark" | "night"
+
 export default function FullScreenReadPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { storage: pdfStorage, isReady } = usePdfStorage()
@@ -81,6 +85,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
   const [activeTool, setActiveTool] = useState<string | null>(null)
   const [activeColor, setActiveColor] = useState("#ffff00") // Yellow for highlights
+  const [readingMode, setReadingMode] = useState<ReadingMode>("light")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
   const [scale, setScale] = useState(1.0)
@@ -111,19 +116,59 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   const [isDrawing, setIsDrawing] = useState(false)
   const [currentPath, setCurrentPath] = useState<Array<{ x: number; y: number }>>([])
 
-  // Simplified color palette
-  const colors = [
-    "#ffff00", // Yellow
-    "#00ff00", // Green
-    "#ff69b4", // Pink
-    "#00bfff", // Blue
-    "#ff4500", // Orange
-    "#9370db", // Purple
-    "#ff0000", // Red
-    "#000000", // Black
-  ]
+  // Color palette for tools (adjusted for different reading modes)
+  const getColors = () => {
+    switch (readingMode) {
+      case "dark":
+        return [
+          "#ffff00", // Yellow
+          "#00ff88", // Bright Green
+          "#ff69b4", // Pink
+          "#00bfff", // Blue
+          "#ff6b35", // Orange
+          "#bb86fc", // Purple
+          "#ff5555", // Red
+          "#ffffff", // White
+        ]
+      case "night":
+        return [
+          "#ffd700", // Gold
+          "#90ee90", // Light Green
+          "#ffb6c1", // Light Pink
+          "#87ceeb", // Sky Blue
+          "#ffa500", // Orange
+          "#dda0dd", // Plum
+          "#ff6347", // Tomato
+          "#f5f5dc", // Beige
+        ]
+      default:
+        return [
+          "#ffff00", // Yellow
+          "#00ff00", // Green
+          "#ff69b4", // Pink
+          "#00bfff", // Blue
+          "#ff4500", // Orange
+          "#9370db", // Purple
+          "#ff0000", // Red
+          "#000000", // Black
+        ]
+    }
+  }
 
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Load and save reading mode preference
+  useEffect(() => {
+    const savedMode = localStorage.getItem(`readingMode_${params.id}`) as ReadingMode
+    if (savedMode && ["light", "dark", "night"].includes(savedMode)) {
+      setReadingMode(savedMode)
+    }
+  }, [params.id])
+
+  const saveReadingMode = useCallback((mode: ReadingMode) => {
+    setReadingMode(mode)
+    localStorage.setItem(`readingMode_${params.id}`, mode)
+  }, [params.id])
 
   // Load book data and PDF
   useEffect(() => {
@@ -224,10 +269,56 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     console.log(`Page ${currentPage} rendered successfully`)
     // Delay to ensure page is fully rendered
     setTimeout(() => {
+      applyReadingModeToPdf()
       hideTextLayer()
       renderAnnotations()
     }, 100)
   }
+
+  // Apply reading mode styles to the PDF content
+  const applyReadingModeToPdf = useCallback(() => {
+    const pdfPageElement = pdfPageRef.current
+    if (pdfPageElement) {
+      const canvas = pdfPageElement.querySelector("canvas")
+      const textLayer = pdfPageElement.querySelector(".react-pdf__Page__textContent")
+
+      if (canvas) {
+        switch (readingMode) {
+          case "dark":
+            canvas.style.filter = "invert(1) hue-rotate(180deg)"
+            canvas.style.backgroundColor = "#1a1a1a"
+            break
+          case "night":
+            canvas.style.filter = "sepia(1) saturate(0.8) hue-rotate(15deg) brightness(0.9)"
+            canvas.style.backgroundColor = "#2d1810"
+            break
+          default:
+            canvas.style.filter = "none"
+            canvas.style.backgroundColor = "#ffffff"
+        }
+      }
+
+      if (textLayer) {
+        const textLayerElement = textLayer as HTMLElement
+        const textSpans = textLayer.querySelectorAll("span")
+
+        textSpans.forEach((span) => {
+          span.style.color = "transparent"
+        })
+
+        switch (readingMode) {
+          case "dark":
+            textLayerElement.style.filter = "invert(1)"
+            break
+          case "night":
+            textLayerElement.style.filter = "sepia(1) saturate(0.8) hue-rotate(15deg)"
+            break
+          default:
+            textLayerElement.style.filter = "none"
+        }
+      }
+    }
+  }, [readingMode])
 
   // Hide text layer to prevent duplication but keep it for text selection
   const hideTextLayer = useCallback(() => {
@@ -367,6 +458,11 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
       document.removeEventListener("mouseup", handleMouseUp)
     }
   }, [activeTool, handleTextSelection])
+
+  // Apply reading mode styles when mode changes
+  useEffect(() => {
+    applyReadingModeToPdf()
+  }, [readingMode, currentPage, applyReadingModeToPdf])
 
   // Update text layer visibility when tool changes
   useEffect(() => {
@@ -649,6 +745,58 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     }
   }
 
+  // Get container styles based on reading mode
+  const getContainerStyles = () => {
+    switch (readingMode) {
+      case "dark":
+        return "bg-gray-900 text-white"
+      case "night":
+        return "bg-amber-950 text-amber-50"
+      default:
+        return "bg-gray-50 text-gray-900"
+    }
+  }
+
+  // Get card styles based on reading mode
+  const getCardStyles = () => {
+    switch (readingMode) {
+      case "dark":
+        return "bg-gray-800 border-gray-700 text-white"
+      case "night":
+        return "bg-amber-900 border-amber-800 text-amber-50"
+      default:
+        return "bg-white border-gray-200 text-gray-900"
+    }
+  }
+
+  // Get button styles based on reading mode
+  const getButtonStyles = (isActive = false) => {
+    if (isActive) {
+      switch (readingMode) {
+        case "dark":
+          return "bg-blue-600 text-white shadow-md"
+        case "night":
+          return "bg-amber-600 text-white shadow-md"
+        default:
+          return "bg-indigo-600 text-white shadow-md"
+      }
+    }
+    
+    switch (readingMode) {
+      case "dark":
+        return "hover:bg-gray-700 text-gray-300"
+      case "night":
+        return "hover:bg-amber-800 text-amber-200"
+      default:
+        return "hover:bg-gray-100 text-gray-600"
+    }
+  }
+
+  // Handle reading mode change
+  const handleReadingModeChange = (mode: ReadingMode) => {
+    saveReadingMode(mode)
+  }
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -682,6 +830,18 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
           e.preventDefault()
           handleToolClick("eraser")
           break
+        case "1":
+          e.preventDefault()
+          handleReadingModeChange("light")
+          break
+        case "2":
+          e.preventDefault()
+          handleReadingModeChange("dark")
+          break
+        case "3":
+          e.preventDefault()
+          handleReadingModeChange("night")
+          break
         case "Escape":
           e.preventDefault()
           setActiveTool(null)
@@ -701,30 +861,30 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   // Show loading state
   if (!isReady || isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center bg-white rounded-2xl shadow-lg p-12 border border-gray-200">
+      <div className={`min-h-screen ${getContainerStyles()} flex items-center justify-center`}>
+        <div className={`text-center ${getCardStyles()} rounded-2xl shadow-lg p-12`}>
           <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Loader2 className="w-8 h-8 text-white animate-spin" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">
+          <h3 className="text-xl font-semibold mb-2">
             {!isReady ? "Initializing PDF storage..." : "Loading your book..."}
           </h3>
-          <p className="text-gray-600">Please wait while we prepare your reading experience</p>
+          <p className="opacity-75">Please wait while we prepare your reading experience</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div className={`h-screen ${getContainerStyles()} flex flex-col overflow-hidden transition-colors duration-300`}>
       {/* Clean Top Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+      <div className={`${getCardStyles()} border-b px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors duration-300`}>
         <div className="flex items-center space-x-6">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => router.back()}
-            className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+            className={`${getButtonStyles()} rounded-lg transition-colors duration-300`}
           >
             <X className="w-5 h-5 mr-2" />
             Exit Reader
@@ -732,15 +892,21 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
           {bookData?.title && (
             <div className="hidden md:flex items-center space-x-3">
-              <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
-              <span className="text-sm font-medium text-gray-700">{bookData.title}</span>
+              <div className={`w-2 h-2 rounded-full ${
+                readingMode === "dark" ? "bg-blue-500" : 
+                readingMode === "night" ? "bg-amber-500" : "bg-indigo-600"
+              }`}></div>
+              <span className="text-sm font-medium opacity-75">{bookData.title}</span>
             </div>
           )}
 
           {/* Status Indicators */}
           <div className="flex items-center space-x-3">
             {activeTool && (
-              <div className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-full">
+              <div className={`flex items-center space-x-2 px-4 py-2 rounded-full text-white ${
+                readingMode === "dark" ? "bg-blue-600" : 
+                readingMode === "night" ? "bg-amber-600" : "bg-indigo-600"
+              }`}>
                 <div className="w-2 h-2 bg-white rounded-full"></div>
                 <span className="text-sm font-medium capitalize">{activeTool} mode</span>
               </div>
@@ -753,16 +919,28 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                 </span>
               </div>
             )}
+
+            {/* Reading mode indicator */}
+            <div className={`flex items-center space-x-2 px-4 py-2 rounded-full ${
+              readingMode === "dark" ? "bg-gray-700 text-gray-300" : 
+              readingMode === "night" ? "bg-amber-800 text-amber-200" : "bg-gray-100 text-gray-700"
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${
+                readingMode === "dark" ? "bg-blue-400" : 
+                readingMode === "night" ? "bg-amber-400" : "bg-yellow-400"
+              }`}></div>
+              <span className="text-sm font-medium capitalize">{readingMode} mode</span>
+            </div>
           </div>
         </div>
 
         <div className="flex items-center space-x-6">
           {/* Page Navigation */}
-          <div className="flex items-center space-x-3 bg-white rounded-lg px-4 py-2 border border-gray-200">
+          <div className={`flex items-center space-x-3 ${getCardStyles()} rounded-lg px-4 py-2 border transition-colors duration-300`}>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-lg hover:bg-gray-100"
+              className={`h-8 w-8 rounded-lg ${getButtonStyles()}`}
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage <= 1}
             >
@@ -774,17 +952,20 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                 type="number"
                 value={currentPage}
                 onChange={(e) => handlePageChange(Number.parseInt(e.target.value) || 1)}
-                className="w-16 h-8 text-center text-sm border-gray-200 rounded-lg"
+                className={`w-16 h-8 text-center text-sm rounded-lg border-0 ${
+                  readingMode === "dark" ? "bg-gray-700 text-white" : 
+                  readingMode === "night" ? "bg-amber-800 text-amber-100" : "bg-gray-50"
+                }`}
                 min={1}
                 max={totalPages}
               />
-              <span className="text-sm text-gray-500 font-medium">of {totalPages}</span>
+              <span className="text-sm font-medium opacity-75">of {totalPages}</span>
             </div>
 
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-lg hover:bg-gray-100"
+              className={`h-8 w-8 rounded-lg ${getButtonStyles()}`}
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage >= totalPages}
             >
@@ -793,24 +974,24 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
           </div>
 
           {/* Zoom Controls */}
-          <div className="flex items-center space-x-3 bg-white rounded-lg px-4 py-2 border border-gray-200">
+          <div className={`flex items-center space-x-3 ${getCardStyles()} rounded-lg px-4 py-2 border transition-colors duration-300`}>
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 rounded-lg hover:bg-gray-100" 
+              className={`h-8 w-8 rounded-lg ${getButtonStyles()}`}
               onClick={() => handleZoomChange(scale - 0.1)}
             >
               <ZoomOut className="w-4 h-4" />
             </Button>
 
-            <span className="text-sm font-medium text-gray-700 min-w-[3rem] text-center">
+            <span className="text-sm font-medium min-w-[3rem] text-center opacity-75">
               {Math.round(scale * 100)}%
             </span>
 
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 rounded-lg hover:bg-gray-100" 
+              className={`h-8 w-8 rounded-lg ${getButtonStyles()}`}
               onClick={() => handleZoomChange(scale + 0.1)}
             >
               <ZoomIn className="w-4 h-4" />
@@ -820,7 +1001,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               variant={fitToScreen ? "default" : "ghost"}
               size="sm"
               onClick={toggleFitToScreen}
-              className="text-xs rounded-lg"
+              className={`text-xs rounded-lg ${fitToScreen ? getButtonStyles(true) : getButtonStyles()}`}
             >
               {fitToScreen ? "Exit Fit" : "Fit Width"}
             </Button>
@@ -832,15 +1013,13 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
       <div className="flex flex-1 overflow-hidden">
         {/* Clean Floating Sidebar */}
         <div className="absolute left-6 top-1/2 transform -translate-y-1/2 z-50">
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-3 flex flex-col space-y-3">
+          <div className={`${getCardStyles()} rounded-2xl shadow-lg border p-3 flex flex-col space-y-3 transition-colors duration-300`}>
             {/* Tool Buttons */}
             <Button
               variant={activeTool === "highlighter" ? "default" : "ghost"}
               size="icon"
               className={`w-12 h-12 rounded-xl transition-all duration-200 ${
-                activeTool === "highlighter" 
-                  ? "bg-indigo-600 text-white shadow-md" 
-                  : "hover:bg-gray-100"
+                activeTool === "highlighter" ? getButtonStyles(true) : getButtonStyles()
               }`}
               onClick={() => handleToolClick("highlighter")}
               title="Text Highlighter (H)"
@@ -852,9 +1031,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               variant={activeTool === "pen" ? "default" : "ghost"}
               size="icon"
               className={`w-12 h-12 rounded-xl transition-all duration-200 ${
-                activeTool === "pen" 
-                  ? "bg-indigo-600 text-white shadow-md" 
-                  : "hover:bg-gray-100"
+                activeTool === "pen" ? getButtonStyles(true) : getButtonStyles()
               }`}
               onClick={() => handleToolClick("pen")}
               title="Drawing Pen (P)"
@@ -866,9 +1043,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               variant={activeTool === "eraser" ? "default" : "ghost"}
               size="icon"
               className={`w-12 h-12 rounded-xl transition-all duration-200 ${
-                activeTool === "eraser" 
-                  ? "bg-indigo-600 text-white shadow-md" 
-                  : "hover:bg-gray-100"
+                activeTool === "eraser" ? getButtonStyles(true) : getButtonStyles()
               }`}
               onClick={() => handleToolClick("eraser")}
               title="Eraser (E)"
@@ -880,9 +1055,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               variant={activeTool === "note" ? "default" : "ghost"}
               size="icon"
               className={`w-12 h-12 rounded-xl transition-all duration-200 ${
-                activeTool === "note" 
-                  ? "bg-indigo-600 text-white shadow-md" 
-                  : "hover:bg-gray-100"
+                activeTool === "note" ? getButtonStyles(true) : getButtonStyles()
               }`}
               onClick={() => handleToolClick("note")}
               title="Add Note (N)"
@@ -891,50 +1064,91 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
             </Button>
 
             {/* Divider */}
-            <div className="w-8 h-px bg-gray-200 mx-auto"></div>
+            <div className={`w-8 h-px mx-auto ${
+              readingMode === "dark" ? "bg-gray-600" : 
+              readingMode === "night" ? "bg-amber-700" : "bg-gray-200"
+            }`}></div>
 
             {/* Action Buttons */}
             <Button 
               variant="ghost" 
               size="icon" 
-              className="w-12 h-12 rounded-xl hover:bg-gray-100 transition-all duration-200" 
+              className={`w-12 h-12 rounded-xl transition-all duration-200 ${getButtonStyles()}`}
               onClick={handleBookmarkClick} 
               title="Bookmark"
             >
-              <BookmarkIcon className="h-5 w-5 text-gray-600" />
+              <BookmarkIcon className="h-5 w-5" />
             </Button>
 
             <Button
               variant="ghost"
               size="icon"
-              className="w-12 h-12 rounded-xl hover:bg-gray-100 transition-all duration-200"
+              className={`w-12 h-12 rounded-xl transition-all duration-200 ${getButtonStyles()}`}
               onClick={handleCreateFlashcard}
               title="Create Flashcard"
             >
-              <BrainCircuit className="h-5 w-5 text-gray-600" />
+              <BrainCircuit className="h-5 w-5" />
             </Button>
 
             {/* Divider */}
-            <div className="w-8 h-px bg-gray-200 mx-auto"></div>
+            <div className={`w-8 h-px mx-auto ${
+              readingMode === "dark" ? "bg-gray-600" : 
+              readingMode === "night" ? "bg-amber-700" : "bg-gray-200"
+            }`}></div>
 
-            {/* Light Mode Indicator */}
-            <div className="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center">
-              <Sun className="h-5 w-5 text-white" />
-            </div>
+            {/* Reading Mode Buttons */}
+            <Button
+              variant={readingMode === "light" ? "default" : "ghost"}
+              size="icon"
+              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
+                readingMode === "light" ? "bg-yellow-500 text-white" : getButtonStyles()
+              }`}
+              onClick={() => handleReadingModeChange("light")}
+              title="Light Mode (1)"
+            >
+              <Sun className="h-5 w-5" />
+            </Button>
+
+            <Button
+              variant={readingMode === "dark" ? "default" : "ghost"}
+              size="icon"
+              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
+                readingMode === "dark" ? "bg-blue-600 text-white" : getButtonStyles()
+              }`}
+              onClick={() => handleReadingModeChange("dark")}
+              title="Dark Mode (2)"
+            >
+              <Moon className="h-5 w-5" />
+            </Button>
+
+            <Button
+              variant={readingMode === "night" ? "default" : "ghost"}
+              size="icon"
+              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
+                readingMode === "night" ? "bg-amber-600 text-white" : getButtonStyles()
+              }`}
+              onClick={() => handleReadingModeChange("night")}
+              title="Night Light Mode (3) - Reduces Blue Light"
+            >
+              <Lightbulb className="h-5 w-5" />
+            </Button>
           </div>
         </div>
 
         {/* Color Palette */}
         {(activeTool === "highlighter" || activeTool === "pen") && (
           <div className="absolute left-24 top-1/2 transform -translate-y-1/2 z-40">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-3 flex flex-col space-y-3">
-              {colors.map((color) => (
+            <div className={`${getCardStyles()} rounded-2xl shadow-lg border p-3 flex flex-col space-y-3 transition-colors duration-300`}>
+              {getColors().map((color) => (
                 <button
                   key={color}
                   className={`w-10 h-10 rounded-xl border-2 transition-all duration-200 ${
                     activeColor === color
-                      ? "border-gray-800 scale-110"
-                      : "border-gray-200 hover:scale-105 hover:border-gray-400"
+                      ? `border-gray-800 scale-110 ${readingMode === "dark" ? "border-white" : ""}`
+                      : `border-gray-200 hover:scale-105 hover:border-gray-400 ${
+                          readingMode === "dark" ? "border-gray-600 hover:border-gray-400" : 
+                          readingMode === "night" ? "border-amber-700 hover:border-amber-500" : ""
+                        }`
                   }`}
                   style={{ backgroundColor: color }}
                   onClick={() => setActiveColor(color)}
@@ -948,7 +1162,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
         {/* PDF Viewer */}
         <div
           ref={containerRef}
-          className="flex-1 overflow-auto"
+          className="flex-1 overflow-auto transition-colors duration-300"
           style={{ 
             height: 'calc(100vh - 80px)',
             maxHeight: 'calc(100vh - 80px)'
@@ -956,15 +1170,15 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
         >
           {pdfError ? (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center p-8 max-w-md bg-white rounded-2xl shadow-lg border border-gray-200">
+              <div className={`text-center p-8 max-w-md ${getCardStyles()} rounded-2xl shadow-lg border transition-colors duration-300`}>
                 <div className="w-16 h-16 bg-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                   <AlertCircle className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-xl font-semibold mb-3 text-gray-800">PDF Not Available</h2>
-                <p className="text-gray-600 mb-6">{pdfError}</p>
+                <h2 className="text-xl font-semibold mb-3">PDF Not Available</h2>
+                <p className="opacity-75 mb-6">{pdfError}</p>
                 <Button 
                   onClick={() => router.back()}
-                  className="bg-indigo-600 text-white rounded-lg"
+                  className={`rounded-lg ${getButtonStyles(true)}`}
                 >
                   Go Back
                 </Button>
@@ -987,24 +1201,27 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
                     loading={
-                      <div className="flex items-center justify-center p-12 bg-white rounded-2xl shadow-lg border border-gray-200">
+                      <div className={`flex items-center justify-center p-12 ${getCardStyles()} rounded-2xl shadow-lg border transition-colors duration-300`}>
                         <div className="text-center">
                           <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
                             <Loader2 className="w-8 h-8 text-white animate-spin" />
                           </div>
-                          <p className="text-gray-600 font-medium">Loading your book...</p>
+                          <p className="font-medium opacity-75">Loading your book...</p>
                         </div>
                       </div>
                     }
                   >
                     <Page
-                      key={`page_${currentPage}_${scale}`}
+                      key={`page_${currentPage}_${scale}_${readingMode}`}
                       pageNumber={currentPage}
                       scale={scale}
                       onRenderSuccess={onPageRenderSuccess}
                       renderTextLayer={true}
                       renderAnnotationLayer={false}
-                      className="shadow-lg border border-gray-200 rounded-lg overflow-hidden bg-white"
+                      className={`shadow-lg border rounded-lg overflow-hidden transition-colors duration-300 ${
+                        readingMode === "dark" ? "border-gray-600" : 
+                        readingMode === "night" ? "border-amber-700" : "border-gray-200"
+                      }`}
                     />
                   </Document>
 
@@ -1039,12 +1256,12 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
             </div>
           ) : (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center bg-white rounded-2xl shadow-lg border border-gray-200 p-12">
+              <div className={`text-center ${getCardStyles()} rounded-2xl shadow-lg border p-12 transition-colors duration-300`}>
                 <div className="w-16 h-16 bg-gray-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                   <BookOpen className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-xl font-semibold mb-3 text-gray-800">No PDF Loaded</h2>
-                <p className="text-gray-600">Please upload a PDF file to start reading</p>
+                <h2 className="text-xl font-semibold mb-3">No PDF Loaded</h2>
+                <p className="opacity-75">Please upload a PDF file to start reading</p>
               </div>
             </div>
           )}
@@ -1054,13 +1271,16 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
       {/* Clean Note Input */}
       {isAddingNote && (
         <div
-          className="absolute bg-white border border-gray-200 rounded-2xl shadow-lg w-80 z-50 p-6"
+          className={`absolute ${getCardStyles()} border rounded-2xl shadow-lg w-80 z-50 p-6 transition-colors duration-300`}
           style={{ left: `${notePosition.x + 100}px`, top: `${notePosition.y + 80}px` }}
         >
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Add Note</h3>
+            <h3 className="text-lg font-semibold mb-2">Add Note</h3>
             <Textarea
-              className="w-full h-32 p-4 text-sm bg-gray-50 border-gray-200 rounded-lg resize-none focus:bg-white transition-colors"
+              className={`w-full h-32 p-4 text-sm rounded-lg resize-none transition-colors duration-300 border-0 ${
+                readingMode === "dark" ? "bg-gray-700 text-white focus:bg-gray-600" : 
+                readingMode === "night" ? "bg-amber-800 text-amber-100 focus:bg-amber-700" : "bg-gray-50 focus:bg-white"
+              }`}
               placeholder="Write your note here..."
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
@@ -1072,14 +1292,14 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               size="sm" 
               variant="ghost" 
               onClick={() => setIsAddingNote(false)}
-              className="rounded-lg"
+              className={`rounded-lg ${getButtonStyles()}`}
             >
               Cancel
             </Button>
             <Button 
               size="sm" 
               onClick={handleNoteSave}
-              className="bg-indigo-600 text-white rounded-lg"
+              className={`rounded-lg ${getButtonStyles(true)}`}
             >
               <Save className="w-4 h-4 mr-2" />
               Save Note
