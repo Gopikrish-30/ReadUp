@@ -85,10 +85,10 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   const [activeColor, setActiveColor] = useState("#ffff00") // Yellow for highlights
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
-  const [scale, setScale] = useState(1.0)
-  const [originalScale, setOriginalScale] = useState(1.0)
+  const [scale, setScale] = useState(1.2) // Start with a reasonable scale
+  const [originalScale, setOriginalScale] = useState(1.2)
   const [fitToScreen, setFitToScreen] = useState(false)
-  const [fitPercentage, setFitPercentage] = useState(95)
+  const [fitPercentage, setFitPercentage] = useState(85) // Reduced for better fit
   const [showFitInput, setShowFitInput] = useState(false)
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [noteText, setNoteText] = useState("")
@@ -259,7 +259,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     const targetWidth = (availableWidth * fitPercentage) / 100
     const newScale = targetWidth / pageWidth
 
-    return Math.max(0.3, Math.min(4.0, newScale))
+    return Math.max(0.5, Math.min(3.0, newScale))
   }, [scale, fitPercentage, activeTool])
 
   useEffect(() => {
@@ -843,7 +843,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
           <Input
             type="number"
             value={fitPercentage}
-            onChange={(e) => handleFitPercentageChange(Number.parseInt(e.target.value) || 95)}
+            onChange={(e) => handleFitPercentageChange(Number.parseInt(e.target.value) || 85)}
             className="w-20 h-8 text-center text-sm"
             min={50}
             max={100}
@@ -947,10 +947,11 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
           </div>
         )}
 
-        {/* PDF Viewer */}
+        {/* PDF Viewer with proper height constraints */}
         <div
           ref={containerRef}
           className="flex-1 bg-gray-50 overflow-auto transition-colors duration-300"
+          style={{ height: 'calc(100vh - 64px)' }} // Subtract header height
         >
           {pdfError ? (
             <div className="flex items-center justify-center h-full">
@@ -961,8 +962,8 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               </div>
             </div>
           ) : pdfUrl ? (
-            <div className="flex justify-center p-8">
-              <div className="relative" ref={pageContainerRef}>
+            <div className="flex justify-center py-4 px-4 min-h-full">
+              <div className="relative max-w-full" ref={pageContainerRef}>
                 {activeTool === "highlighter" && (
                   <div className="absolute -top-8 left-0 right-0 text-center z-20">
                     <div className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
@@ -971,7 +972,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                   </div>
                 )}
 
-                <div ref={pdfPageRef} className="relative">
+                <div ref={pdfPageRef} className="relative inline-block">
                   <Document
                     file={pdfUrl}
                     onLoadSuccess={onDocumentLoadSuccess}
@@ -989,7 +990,9 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                       onRenderSuccess={onPageRenderSuccess}
                       renderTextLayer={true}
                       renderAnnotationLayer={false}
-                      className="shadow-lg border border-gray-200 rounded-lg transition-all duration-300"
+                      className="shadow-lg border border-gray-200 rounded-lg transition-all duration-300 max-w-full"
+                      width={undefined} // Let PDF.js calculate width based on scale
+                      height={undefined} // Let PDF.js calculate height based on scale
                     />
                   </Document>
 
