@@ -724,28 +724,14 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     return "bg-gray-50 p-4 rounded-lg"
   }
 
-  // Get toolbar styles based on reading mode
+  // Get toolbar styles - always light mode
   const getToolbarStyles = () => {
-    switch (readingMode) {
-      case "dark":
-        return "bg-gray-800 border-gray-700"
-      case "sepia":
-        return "bg-amber-100 border-amber-200"
-      default:
-        return "bg-white border-gray-200"
-    }
+    return "bg-white border-gray-200"
   }
 
-  // Get sidebar styles based on reading mode
+  // Get sidebar styles - always light mode
   const getSidebarStyles = () => {
-    switch (readingMode) {
-      case "dark":
-        return "bg-gray-800 border-gray-700"
-      case "sepia":
-        return "bg-amber-100 border-amber-200"
-      default:
-        return "bg-white border-gray-200"
-    }
+    return "bg-white border-gray-200"
   }
 
   // Keyboard navigation
@@ -856,11 +842,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
           {/* Reading mode indicator */}
           <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                readingMode === "light" ? "bg-yellow-400" : readingMode === "dark" ? "bg-gray-600" : "bg-amber-600"
-              }`}
-            ></div>
+            <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">{readingMode} mode</span>
           </div>
         </div>
@@ -1156,23 +1138,11 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
       {/* Note Input */}
       {isAddingNote && (
         <div
-          className={`absolute ${
-            readingMode === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : readingMode === "sepia"
-                ? "bg-amber-50 border-amber-300"
-                : "bg-yellow-100 border-yellow-300"
-          } p-3 rounded-md shadow-lg w-64 z-40 transition-colors duration-300`}
+          className="absolute bg-yellow-100 border-yellow-300 p-3 rounded-md shadow-lg w-64 z-40 transition-colors duration-300"
           style={{ left: `${notePosition.x + 80}px`, top: `${notePosition.y + 60}px` }}
         >
           <Textarea
-            className={`w-full h-24 p-2 text-sm bg-transparent border rounded resize-none ${
-              readingMode === "dark"
-                ? "border-gray-600 text-gray-100"
-                : readingMode === "sepia"
-                  ? "border-amber-300 text-amber-900"
-                  : "border-yellow-300"
-            }`}
+            className="w-full h-24 p-2 text-sm bg-transparent border rounded resize-none border-yellow-300"
             placeholder="Add your note here..."
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
@@ -1191,11 +1161,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
       )}
 
       {/* Keyboard shortcuts help */}
-      <div
-        className={`fixed bottom-4 right-4 ${
-          readingMode === "dark" ? "bg-gray-800/90" : readingMode === "sepia" ? "bg-amber-900/90" : "bg-black/70"
-        } text-white text-xs p-2 rounded opacity-50 hover:opacity-100 transition-all duration-300`}
-      >
+      <div className="fixed bottom-4 right-4 bg-black/70 text-white text-xs p-2 rounded opacity-50 hover:opacity-100 transition-all duration-300">
         <div>← → : Navigate pages</div>
         <div>H : Text Highlighter</div>
         <div>P : Drawing Pen</div>
@@ -1207,11 +1173,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
       </div>
 
       {/* Annotations count */}
-      <div
-        className={`fixed bottom-4 left-4 ${
-          readingMode === "dark" ? "bg-gray-800/90" : readingMode === "sepia" ? "bg-amber-900/90" : "bg-black/70"
-        } text-white text-xs p-2 rounded transition-all duration-300`}
-      >
+      <div className="fixed bottom-4 left-4 bg-black/70 text-white text-xs p-2 rounded transition-all duration-300">
         <div>
           Page {currentPage}: {annotations.highlights.filter((h) => h.page === currentPage).length} highlights,{" "}
           {annotations.drawings.filter((d) => d.page === currentPage).length} drawings,{" "}
