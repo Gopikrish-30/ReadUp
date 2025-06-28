@@ -85,10 +85,10 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   const [activeColor, setActiveColor] = useState("#ffff00") // Yellow for highlights
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
-  const [scale, setScale] = useState(1.2) // Start with a reasonable scale
-  const [originalScale, setOriginalScale] = useState(1.2)
+  const [scale, setScale] = useState(1.0) // Start with normal scale
+  const [originalScale, setOriginalScale] = useState(1.0)
   const [fitToScreen, setFitToScreen] = useState(false)
-  const [fitPercentage, setFitPercentage] = useState(85) // Reduced for better fit
+  const [fitPercentage, setFitPercentage] = useState(90) // Better fit percentage
   const [showFitInput, setShowFitInput] = useState(false)
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [noteText, setNoteText] = useState("")
@@ -227,20 +227,35 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     console.log(`Page ${currentPage} rendered successfully`)
     // Delay to ensure page is fully rendered
     setTimeout(() => {
-      renderAnnotations()
       hideTextLayer()
-    }, 200)
+      renderAnnotations()
+    }, 100)
   }
 
-  // Hide text layer to prevent duplication
+  // Hide text layer to prevent duplication but keep it for text selection
   const hideTextLayer = useCallback(() => {
     if (pdfPageRef.current) {
       const textLayer = pdfPageRef.current.querySelector('.react-pdf__Page__textContent')
       if (textLayer) {
         const textLayerElement = textLayer as HTMLElement
-        // Make text layer invisible but keep it for text selection
+        // Completely hide the text layer visually but keep it functional
         textLayerElement.style.opacity = '0'
+        textLayerElement.style.position = 'absolute'
+        textLayerElement.style.top = '0'
+        textLayerElement.style.left = '0'
+        textLayerElement.style.width = '100%'
+        textLayerElement.style.height = '100%'
         textLayerElement.style.pointerEvents = activeTool === 'highlighter' ? 'auto' : 'none'
+        textLayerElement.style.userSelect = activeTool === 'highlighter' ? 'text' : 'none'
+        textLayerElement.style.zIndex = '10'
+        
+        // Hide all text spans
+        const textSpans = textLayer.querySelectorAll('span')
+        textSpans.forEach((span) => {
+          const spanElement = span as HTMLElement
+          spanElement.style.color = 'transparent'
+          spanElement.style.background = 'transparent'
+        })
       }
     }
   }, [activeTool])
@@ -250,7 +265,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     if (!containerRef.current || !pdfPageRef.current) return scale
 
     const sidebarWidth = activeTool === "highlighter" || activeTool === "pen" ? 28 : 16
-    const availableWidth = window.innerWidth - sidebarWidth - 64 // Extra padding
+    const availableWidth = window.innerWidth - sidebarWidth - 80 // More padding
 
     const pageElement = pdfPageRef.current.querySelector(".react-pdf__Page")
     if (!pageElement) return scale
@@ -259,7 +274,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     const targetWidth = (availableWidth * fitPercentage) / 100
     const newScale = targetWidth / pageWidth
 
-    return Math.max(0.5, Math.min(3.0, newScale))
+    return Math.max(0.5, Math.min(2.5, newScale))
   }, [scale, fitPercentage, activeTool])
 
   useEffect(() => {
@@ -359,7 +374,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   // Update text layer visibility when tool changes
   useEffect(() => {
     hideTextLayer()
-  }, [activeTool, hideTextLayer])
+  }, [activeTool, hideTextLayer, currentPage])
 
   // Render annotations on overlay canvas
   const renderAnnotations = useCallback(() => {
@@ -601,7 +616,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   }
 
   const handleZoomChange = (newScale: number) => {
-    const clampedScale = Math.max(0.5, Math.min(3, Math.round(newScale * 10) / 10))
+    const clampedScale = Math.max(0.5, Math.min(2.5, Math.round(newScale * 10) / 10))
     if (clampedScale !== scale) {
       setScale(clampedScale)
       if (fitToScreen) {
@@ -714,9 +729,9 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   }
 
   return (
-    <div className="h-screen bg-white text-gray-900 flex flex-col transition-colors duration-300 overflow-hidden">
+    <div className="h-screen bg-white text-gray-900 flex flex-col overflow-hidden">
       {/* Top Bar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between transition-colors duration-300 flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-4">
           <Button variant="ghost" size="sm" onClick={() => router.back()}>
             <X className="w-5 h-5 mr-2" />
@@ -843,7 +858,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
           <Input
             type="number"
             value={fitPercentage}
-            onChange={(e) => handleFitPercentageChange(Number.parseInt(e.target.value) || 85)}
+            onChange={(e) => handleFitPercentageChange(Number.parseInt(e.target.value) || 90)}
             className="w-20 h-8 text-center text-sm"
             min={50}
             max={100}
@@ -856,9 +871,9 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
       )}
 
       {/* Main Content */}
-      <div className="flex flex-1 relative overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar */}
-        <div className="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4 space-y-6 transition-colors duration-300 flex-shrink-0">
+        <div className="w-16 bg-white border-r border-gray-200 flex flex-col items-center py-4 space-y-6 flex-shrink-0">
           <Button
             variant={activeTool === "highlighter" ? "secondary" : "ghost"}
             size="icon"
@@ -930,7 +945,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
         {/* Color Palette */}
         {(activeTool === "highlighter" || activeTool === "pen") && (
-          <div className="w-12 bg-white border-r border-gray-200 flex flex-col items-center py-4 space-y-2 transition-colors duration-300 flex-shrink-0">
+          <div className="w-12 bg-white border-r border-gray-200 flex flex-col items-center py-4 space-y-2 flex-shrink-0">
             {colors.map((color) => (
               <button
                 key={color}
@@ -947,11 +962,14 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
           </div>
         )}
 
-        {/* PDF Viewer with proper height constraints */}
+        {/* PDF Viewer with constrained height and proper scrolling */}
         <div
           ref={containerRef}
-          className="flex-1 bg-gray-50 overflow-auto transition-colors duration-300"
-          style={{ height: 'calc(100vh - 64px)' }} // Subtract header height
+          className="flex-1 bg-gray-50 overflow-auto"
+          style={{ 
+            height: 'calc(100vh - 64px)', // Subtract header height
+            maxHeight: 'calc(100vh - 64px)' // Ensure it doesn't exceed viewport
+          }}
         >
           {pdfError ? (
             <div className="flex items-center justify-center h-full">
@@ -962,8 +980,8 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               </div>
             </div>
           ) : pdfUrl ? (
-            <div className="flex justify-center py-4 px-4 min-h-full">
-              <div className="relative max-w-full" ref={pageContainerRef}>
+            <div className="flex justify-center py-6 px-4">
+              <div className="relative" ref={pageContainerRef}>
                 {activeTool === "highlighter" && (
                   <div className="absolute -top-8 left-0 right-0 text-center z-20">
                     <div className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
@@ -972,7 +990,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                   </div>
                 )}
 
-                <div ref={pdfPageRef} className="relative inline-block">
+                <div ref={pdfPageRef} className="relative">
                   <Document
                     file={pdfUrl}
                     onLoadSuccess={onDocumentLoadSuccess}
@@ -990,9 +1008,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                       onRenderSuccess={onPageRenderSuccess}
                       renderTextLayer={true}
                       renderAnnotationLayer={false}
-                      className="shadow-lg border border-gray-200 rounded-lg transition-all duration-300 max-w-full"
-                      width={undefined} // Let PDF.js calculate width based on scale
-                      height={undefined} // Let PDF.js calculate height based on scale
+                      className="shadow-lg border border-gray-200 rounded-lg"
                     />
                   </Document>
 
@@ -1040,7 +1056,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
       {/* Note Input */}
       {isAddingNote && (
         <div
-          className="absolute bg-yellow-100 border-yellow-300 p-3 rounded-md shadow-lg w-64 z-40 transition-colors duration-300"
+          className="absolute bg-yellow-100 border-yellow-300 p-3 rounded-md shadow-lg w-64 z-40"
           style={{ left: `${notePosition.x + 80}px`, top: `${notePosition.y + 60}px` }}
         >
           <Textarea
@@ -1074,7 +1090,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
       </div>
 
       {/* Annotations count */}
-      <div className="fixed bottom-4 left-4 bg-black/70 text-white text-xs p-2 rounded transition-all duration-300">
+      <div className="fixed bottom-4 left-4 bg-black/70 text-white text-xs p-2 rounded">
         <div>
           Page {currentPage}: {annotations.highlights.filter((h) => h.page === currentPage).length} highlights,{" "}
           {annotations.drawings.filter((d) => d.page === currentPage).length} drawings,{" "}
