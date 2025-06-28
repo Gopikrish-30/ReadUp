@@ -22,9 +22,7 @@ import {
   ZoomOut,
   AlertCircle,
   Loader2,
-  Settings,
 } from "lucide-react"
-import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { usePdfStorage } from "@/hooks/use-pdf-storage"
@@ -89,7 +87,6 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   const [originalScale, setOriginalScale] = useState(1.0)
   const [fitToScreen, setFitToScreen] = useState(false)
   const [fitPercentage, setFitPercentage] = useState(90)
-  const [showFitInput, setShowFitInput] = useState(false)
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [noteText, setNoteText] = useState("")
   const [notePosition, setNotePosition] = useState({ x: 0, y: 0 })
@@ -114,7 +111,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   const [isDrawing, setIsDrawing] = useState(false)
   const [currentPath, setCurrentPath] = useState<Array<{ x: number; y: number }>>([])
 
-  // Color palette for tools
+  // Simplified color palette
   const colors = [
     "#ffff00", // Yellow
     "#00ff00", // Green
@@ -639,18 +636,6 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     }
   }
 
-  const handleFitPercentageChange = (newPercentage: number) => {
-    const clampedPercentage = Math.max(50, Math.min(100, newPercentage))
-    setFitPercentage(clampedPercentage)
-
-    if (fitToScreen) {
-      setTimeout(() => {
-        const newScale = calculateFitToScreenScale()
-        setScale(newScale)
-      }, 100)
-    }
-  }
-
   const handleToolClick = (tool: string) => {
     if (activeTool === tool) {
       setActiveTool(null)
@@ -701,7 +686,6 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
           e.preventDefault()
           setActiveTool(null)
           window.getSelection()?.removeAllRanges()
-          setShowFitInput(false)
           break
         case "f":
           e.preventDefault()
@@ -717,30 +701,30 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   // Show loading state
   if (!isReady || isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <div className="text-center bg-white rounded-2xl shadow-xl p-12 border border-slate-200">
-          <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center bg-white rounded-2xl shadow-lg p-12 border border-gray-200">
+          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Loader2 className="w-8 h-8 text-white animate-spin" />
           </div>
-          <h3 className="text-xl font-semibold text-slate-800 mb-2">
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">
             {!isReady ? "Initializing PDF storage..." : "Loading your book..."}
           </h3>
-          <p className="text-slate-600">Please wait while we prepare your reading experience</p>
+          <p className="text-gray-600">Please wait while we prepare your reading experience</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col overflow-hidden">
-      {/* Modern Top Bar */}
-      <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 px-6 py-3 flex items-center justify-between flex-shrink-0 shadow-sm">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+      {/* Clean Top Bar */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-6">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => router.back()}
-            className="text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all duration-200"
+            className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
           >
             <X className="w-5 h-5 mr-2" />
             Exit Reader
@@ -748,22 +732,22 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
           {bookData?.title && (
             <div className="hidden md:flex items-center space-x-3">
-              <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-              <span className="text-sm font-medium text-slate-700">{bookData.title}</span>
+              <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
+              <span className="text-sm font-medium text-gray-700">{bookData.title}</span>
             </div>
           )}
 
           {/* Status Indicators */}
           <div className="flex items-center space-x-3">
             {activeTool && (
-              <div className="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-2 rounded-full shadow-lg">
-                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+              <div className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-full">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
                 <span className="text-sm font-medium capitalize">{activeTool} mode</span>
               </div>
             )}
 
             {selectedText && (
-              <div className="flex items-center space-x-2 bg-gradient-to-r from-amber-400 to-orange-500 text-white px-4 py-2 rounded-full shadow-lg">
+              <div className="flex items-center space-x-2 bg-amber-500 text-white px-4 py-2 rounded-full">
                 <span className="text-sm font-medium">
                   "{selectedText.substring(0, 25)}{selectedText.length > 25 ? "..." : ""}" selected
                 </span>
@@ -774,11 +758,11 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
         <div className="flex items-center space-x-6">
           {/* Page Navigation */}
-          <div className="flex items-center space-x-3 bg-white rounded-2xl px-4 py-2 shadow-lg border border-slate-200">
+          <div className="flex items-center space-x-3 bg-white rounded-lg px-4 py-2 border border-gray-200">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-xl hover:bg-slate-100"
+              className="h-8 w-8 rounded-lg hover:bg-gray-100"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage <= 1}
             >
@@ -790,17 +774,17 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                 type="number"
                 value={currentPage}
                 onChange={(e) => handlePageChange(Number.parseInt(e.target.value) || 1)}
-                className="w-16 h-8 text-center text-sm border-0 bg-slate-50 rounded-lg focus:bg-white transition-colors"
+                className="w-16 h-8 text-center text-sm border-gray-200 rounded-lg"
                 min={1}
                 max={totalPages}
               />
-              <span className="text-sm text-slate-500 font-medium">of {totalPages}</span>
+              <span className="text-sm text-gray-500 font-medium">of {totalPages}</span>
             </div>
 
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-xl hover:bg-slate-100"
+              className="h-8 w-8 rounded-lg hover:bg-gray-100"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage >= totalPages}
             >
@@ -809,99 +793,54 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
           </div>
 
           {/* Zoom Controls */}
-          <div className="flex items-center space-x-3 bg-white rounded-2xl px-4 py-2 shadow-lg border border-slate-200">
+          <div className="flex items-center space-x-3 bg-white rounded-lg px-4 py-2 border border-gray-200">
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 rounded-xl hover:bg-slate-100" 
+              className="h-8 w-8 rounded-lg hover:bg-gray-100" 
               onClick={() => handleZoomChange(scale - 0.1)}
             >
               <ZoomOut className="w-4 h-4" />
             </Button>
 
-            <Slider
-              value={[scale * 100]}
-              min={50}
-              max={200}
-              step={10}
-              className="w-24"
-              onValueChange={(value) => handleZoomChange(value[0] / 100)}
-              disabled={fitToScreen}
-            />
+            <span className="text-sm font-medium text-gray-700 min-w-[3rem] text-center">
+              {Math.round(scale * 100)}%
+            </span>
 
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 rounded-xl hover:bg-slate-100" 
+              className="h-8 w-8 rounded-lg hover:bg-gray-100" 
               onClick={() => handleZoomChange(scale + 0.1)}
             >
               <ZoomIn className="w-4 h-4" />
             </Button>
 
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={fitToScreen ? "default" : "ghost"}
-                size="sm"
-                onClick={toggleFitToScreen}
-                className="text-xs rounded-xl"
-              >
-                {fitToScreen ? "Exit Fit" : "Fit Width"}
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-xl hover:bg-slate-100"
-                onClick={() => setShowFitInput(!showFitInput)}
-              >
-                <Settings className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <span className="text-sm font-medium text-slate-700 min-w-[3rem] text-center">
-              {Math.round(scale * 100)}%
-            </span>
+            <Button
+              variant={fitToScreen ? "default" : "ghost"}
+              size="sm"
+              onClick={toggleFitToScreen}
+              className="text-xs rounded-lg"
+            >
+              {fitToScreen ? "Exit Fit" : "Fit Width"}
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Fit Percentage Input */}
-      {showFitInput && (
-        <div className="bg-white/90 backdrop-blur-xl border-b border-slate-200/60 px-6 py-3 flex items-center justify-center space-x-4 shadow-sm">
-          <span className="text-sm text-slate-600 font-medium">Fit Percentage:</span>
-          <Input
-            type="number"
-            value={fitPercentage}
-            onChange={(e) => handleFitPercentageChange(Number.parseInt(e.target.value) || 90)}
-            className="w-20 h-8 text-center text-sm rounded-xl border-slate-200"
-            min={50}
-            max={100}
-          />
-          <span className="text-sm text-slate-500">%</span>
-          <Button 
-            size="sm" 
-            variant="ghost" 
-            onClick={() => setShowFitInput(false)}
-            className="rounded-xl"
-          >
-            Done
-          </Button>
-        </div>
-      )}
-
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Modern Floating Sidebar */}
+        {/* Clean Floating Sidebar */}
         <div className="absolute left-6 top-1/2 transform -translate-y-1/2 z-50">
-          <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-200/60 p-3 flex flex-col space-y-4">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-3 flex flex-col space-y-3">
             {/* Tool Buttons */}
             <Button
               variant={activeTool === "highlighter" ? "default" : "ghost"}
               size="icon"
-              className={`w-12 h-12 rounded-2xl transition-all duration-200 ${
+              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
                 activeTool === "highlighter" 
-                  ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg scale-110" 
-                  : "hover:bg-slate-100 hover:scale-105"
+                  ? "bg-indigo-600 text-white shadow-md" 
+                  : "hover:bg-gray-100"
               }`}
               onClick={() => handleToolClick("highlighter")}
               title="Text Highlighter (H)"
@@ -912,10 +851,10 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
             <Button
               variant={activeTool === "pen" ? "default" : "ghost"}
               size="icon"
-              className={`w-12 h-12 rounded-2xl transition-all duration-200 ${
+              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
                 activeTool === "pen" 
-                  ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg scale-110" 
-                  : "hover:bg-slate-100 hover:scale-105"
+                  ? "bg-indigo-600 text-white shadow-md" 
+                  : "hover:bg-gray-100"
               }`}
               onClick={() => handleToolClick("pen")}
               title="Drawing Pen (P)"
@@ -926,10 +865,10 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
             <Button
               variant={activeTool === "eraser" ? "default" : "ghost"}
               size="icon"
-              className={`w-12 h-12 rounded-2xl transition-all duration-200 ${
+              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
                 activeTool === "eraser" 
-                  ? "bg-gradient-to-r from-red-500 to-pink-600 text-white shadow-lg scale-110" 
-                  : "hover:bg-slate-100 hover:scale-105"
+                  ? "bg-indigo-600 text-white shadow-md" 
+                  : "hover:bg-gray-100"
               }`}
               onClick={() => handleToolClick("eraser")}
               title="Eraser (E)"
@@ -940,10 +879,10 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
             <Button
               variant={activeTool === "note" ? "default" : "ghost"}
               size="icon"
-              className={`w-12 h-12 rounded-2xl transition-all duration-200 ${
+              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
                 activeTool === "note" 
-                  ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg scale-110" 
-                  : "hover:bg-slate-100 hover:scale-105"
+                  ? "bg-indigo-600 text-white shadow-md" 
+                  : "hover:bg-gray-100"
               }`}
               onClick={() => handleToolClick("note")}
               title="Add Note (N)"
@@ -952,34 +891,34 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
             </Button>
 
             {/* Divider */}
-            <div className="w-8 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent mx-auto"></div>
+            <div className="w-8 h-px bg-gray-200 mx-auto"></div>
 
             {/* Action Buttons */}
             <Button 
               variant="ghost" 
               size="icon" 
-              className="w-12 h-12 rounded-2xl hover:bg-slate-100 hover:scale-105 transition-all duration-200" 
+              className="w-12 h-12 rounded-xl hover:bg-gray-100 transition-all duration-200" 
               onClick={handleBookmarkClick} 
               title="Bookmark"
             >
-              <BookmarkIcon className="h-5 w-5 text-purple-600" />
+              <BookmarkIcon className="h-5 w-5 text-gray-600" />
             </Button>
 
             <Button
               variant="ghost"
               size="icon"
-              className="w-12 h-12 rounded-2xl hover:bg-slate-100 hover:scale-105 transition-all duration-200"
+              className="w-12 h-12 rounded-xl hover:bg-gray-100 transition-all duration-200"
               onClick={handleCreateFlashcard}
               title="Create Flashcard"
             >
-              <BrainCircuit className="h-5 w-5 text-emerald-600" />
+              <BrainCircuit className="h-5 w-5 text-gray-600" />
             </Button>
 
             {/* Divider */}
-            <div className="w-8 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent mx-auto"></div>
+            <div className="w-8 h-px bg-gray-200 mx-auto"></div>
 
             {/* Light Mode Indicator */}
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center">
               <Sun className="h-5 w-5 text-white" />
             </div>
           </div>
@@ -988,14 +927,14 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
         {/* Color Palette */}
         {(activeTool === "highlighter" || activeTool === "pen") && (
           <div className="absolute left-24 top-1/2 transform -translate-y-1/2 z-40">
-            <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-200/60 p-3 flex flex-col space-y-3">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-3 flex flex-col space-y-3">
               {colors.map((color) => (
                 <button
                   key={color}
-                  className={`w-10 h-10 rounded-2xl border-3 transition-all duration-200 ${
+                  className={`w-10 h-10 rounded-xl border-2 transition-all duration-200 ${
                     activeColor === color
-                      ? "border-slate-800 scale-110 shadow-lg"
-                      : "border-slate-200 hover:scale-105 hover:border-slate-400"
+                      ? "border-gray-800 scale-110"
+                      : "border-gray-200 hover:scale-105 hover:border-gray-400"
                   }`}
                   style={{ backgroundColor: color }}
                   onClick={() => setActiveColor(color)}
@@ -1017,15 +956,15 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
         >
           {pdfError ? (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center p-8 max-w-md bg-white rounded-3xl shadow-xl border border-slate-200">
-                <div className="w-16 h-16 bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <div className="text-center p-8 max-w-md bg-white rounded-2xl shadow-lg border border-gray-200">
+                <div className="w-16 h-16 bg-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                   <AlertCircle className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-xl font-semibold mb-3 text-slate-800">PDF Not Available</h2>
-                <p className="text-slate-600 mb-6">{pdfError}</p>
+                <h2 className="text-xl font-semibold mb-3 text-gray-800">PDF Not Available</h2>
+                <p className="text-gray-600 mb-6">{pdfError}</p>
                 <Button 
                   onClick={() => router.back()}
-                  className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl"
+                  className="bg-indigo-600 text-white rounded-lg"
                 >
                   Go Back
                 </Button>
@@ -1036,8 +975,8 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               <div className="relative" ref={pageContainerRef}>
                 {activeTool === "highlighter" && (
                   <div className="absolute -top-12 left-0 right-0 text-center z-20">
-                    <div className="inline-block bg-gradient-to-r from-amber-400 to-yellow-500 text-white px-6 py-2 rounded-full text-sm font-medium shadow-lg">
-                      ✨ Select text to highlight it
+                    <div className="inline-block bg-amber-500 text-white px-6 py-2 rounded-full text-sm font-medium">
+                      Select text to highlight it
                     </div>
                   </div>
                 )}
@@ -1048,12 +987,12 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
                     loading={
-                      <div className="flex items-center justify-center p-12 bg-white rounded-3xl shadow-xl border border-slate-200">
+                      <div className="flex items-center justify-center p-12 bg-white rounded-2xl shadow-lg border border-gray-200">
                         <div className="text-center">
-                          <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
                             <Loader2 className="w-8 h-8 text-white animate-spin" />
                           </div>
-                          <p className="text-slate-600 font-medium">Loading your book...</p>
+                          <p className="text-gray-600 font-medium">Loading your book...</p>
                         </div>
                       </div>
                     }
@@ -1065,14 +1004,14 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                       onRenderSuccess={onPageRenderSuccess}
                       renderTextLayer={true}
                       renderAnnotationLayer={false}
-                      className="shadow-2xl border border-slate-200 rounded-2xl overflow-hidden bg-white"
+                      className="shadow-lg border border-gray-200 rounded-lg overflow-hidden bg-white"
                     />
                   </Document>
 
                   {/* Overlay Canvas */}
                   <canvas
                     ref={overlayCanvasRef}
-                    className="absolute top-0 left-0 pointer-events-none rounded-2xl"
+                    className="absolute top-0 left-0 pointer-events-none rounded-lg"
                     style={{
                       pointerEvents: activeTool && activeTool !== "highlighter" ? "auto" : "none",
                       cursor: activeTool === "eraser" ? "grab" : activeTool === "pen" ? "crosshair" : "default",
@@ -1088,7 +1027,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                     .map((note) => (
                       <div
                         key={note.id}
-                        className="absolute w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-sm font-bold text-white cursor-pointer shadow-xl hover:scale-110 transition-transform z-10 border-2 border-white"
+                        className="absolute w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-sm font-bold text-white cursor-pointer shadow-lg hover:scale-110 transition-transform z-10 border-2 border-white"
                         style={{ left: note.position.x, top: note.position.y }}
                         title={note.text}
                       >
@@ -1100,28 +1039,28 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
             </div>
           ) : (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center bg-white rounded-3xl shadow-xl border border-slate-200 p-12">
-                <div className="w-16 h-16 bg-gradient-to-r from-slate-400 to-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <div className="text-center bg-white rounded-2xl shadow-lg border border-gray-200 p-12">
+                <div className="w-16 h-16 bg-gray-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                   <BookOpen className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-xl font-semibold mb-3 text-slate-800">No PDF Loaded</h2>
-                <p className="text-slate-600">Please upload a PDF file to start reading</p>
+                <h2 className="text-xl font-semibold mb-3 text-gray-800">No PDF Loaded</h2>
+                <p className="text-gray-600">Please upload a PDF file to start reading</p>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Modern Note Input */}
+      {/* Clean Note Input */}
       {isAddingNote && (
         <div
-          className="absolute bg-white/95 backdrop-blur-xl border border-slate-200 rounded-3xl shadow-2xl w-80 z-50 p-6"
+          className="absolute bg-white border border-gray-200 rounded-2xl shadow-lg w-80 z-50 p-6"
           style={{ left: `${notePosition.x + 100}px`, top: `${notePosition.y + 80}px` }}
         >
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">Add Note</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">Add Note</h3>
             <Textarea
-              className="w-full h-32 p-4 text-sm bg-slate-50 border-slate-200 rounded-2xl resize-none focus:bg-white transition-colors"
+              className="w-full h-32 p-4 text-sm bg-gray-50 border-gray-200 rounded-lg resize-none focus:bg-white transition-colors"
               placeholder="Write your note here..."
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
@@ -1133,14 +1072,14 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               size="sm" 
               variant="ghost" 
               onClick={() => setIsAddingNote(false)}
-              className="rounded-xl"
+              className="rounded-lg"
             >
               Cancel
             </Button>
             <Button 
               size="sm" 
               onClick={handleNoteSave}
-              className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-shadow"
+              className="bg-indigo-600 text-white rounded-lg"
             >
               <Save className="w-4 h-4 mr-2" />
               Save Note
