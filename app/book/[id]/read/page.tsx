@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Document, Page, pdfjs } from "react-pdf"
 import { Button } from "@/components/ui/button"
@@ -82,9 +81,10 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null)
   const pageContainerRef = useRef<HTMLDivElement>(null)
   const pdfPageRef = useRef<HTMLDivElement>(null)
+  const documentRef = useRef<any>(null)
 
   const [activeTool, setActiveTool] = useState<string | null>(null)
-  const [activeColor, setActiveColor] = useState("#ffff00") // Yellow for highlights
+  const [activeColor, setActiveColor] = useState("#ffff00")
   const [readingMode, setReadingMode] = useState<ReadingMode>("light")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
@@ -100,6 +100,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [pdfDocument, setPdfDocument] = useState<any>(null)
 
   // Text selection states
   const [selectedText, setSelectedText] = useState("")
@@ -116,41 +117,23 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   const [isDrawing, setIsDrawing] = useState(false)
   const [currentPath, setCurrentPath] = useState<Array<{ x: number; y: number }>>([])
 
-  // Color palette for tools (adjusted for different reading modes)
+  // Color palette for tools
   const getColors = () => {
     switch (readingMode) {
       case "dark":
         return [
-          "#ffff00", // Yellow
-          "#00ff88", // Bright Green
-          "#ff69b4", // Pink
-          "#00bfff", // Blue
-          "#ff6b35", // Orange
-          "#bb86fc", // Purple
-          "#ff5555", // Red
-          "#ffffff", // White
+          "#ffff00", "#00ff88", "#ff69b4", "#00bfff", 
+          "#ff6b35", "#bb86fc", "#ff5555", "#ffffff"
         ]
       case "night":
         return [
-          "#ffd700", // Gold
-          "#90ee90", // Light Green
-          "#ffb6c1", // Light Pink
-          "#87ceeb", // Sky Blue
-          "#ffa500", // Orange
-          "#dda0dd", // Plum
-          "#ff6347", // Tomato
-          "#f5f5dc", // Beige
+          "#ffd700", "#90ee90", "#ffb6c1", "#87ceeb", 
+          "#ffa500", "#dda0dd", "#ff6347", "#f5f5dc"
         ]
       default:
         return [
-          "#ffff00", // Yellow
-          "#00ff00", // Green
-          "#ff69b4", // Pink
-          "#00bfff", // Blue
-          "#ff4500", // Orange
-          "#9370db", // Purple
-          "#ff0000", // Red
-          "#000000", // Black
+          "#ffff00", "#00ff00", "#ff69b4", "#00bfff", 
+          "#ff4500", "#9370db", "#ff0000", "#000000"
         ]
     }
   }
@@ -166,6 +149,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   }, [params.id])
 
   const saveReadingMode = useCallback((mode: ReadingMode) => {
+    console.log(`Switching reading mode to: ${mode}`)
     setReadingMode(mode)
     localStorage.setItem(`readingMode_${params.id}`, mode)
   }, [params.id])
@@ -184,7 +168,6 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
           setBookData(book)
           console.log("Book data loaded:", book)
 
-          // Load annotations from localStorage
           const savedAnnotations = localStorage.getItem(`annotations_${params.id}`)
           if (savedAnnotations) {
             setAnnotations(JSON.parse(savedAnnotations))
@@ -199,8 +182,6 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
             if (file) {
               console.log("PDF file loaded from storage:", file.name)
               setPdfFile(file)
-
-              // Create blob URL for react-pdf
               const url = URL.createObjectURL(file)
               setPdfUrl(url)
               setPdfError(null)
@@ -224,7 +205,6 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
     loadBookData()
 
-    // Cleanup blob URL on unmount
     return () => {
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl)
@@ -264,87 +244,92 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     setPdfError(`Error loading PDF document: ${error.message}. Please try uploading the PDF again.`)
   }
 
-  // Handle page render success
-  const onPageRenderSuccess = () => {
+  // Handle page render success - STABLE VERSION
+  const onPageRenderSuccess = useCallback(() => {
     console.log(`Page ${currentPage} rendered successfully`)
-    // Delay to ensure page is fully rendered
+    
+    // Apply reading mode styles with proper timing
     setTimeout(() => {
       applyReadingModeToPdf()
-      hideTextLayer()
-      renderAnnotations()
     }, 100)
-  }
+    
+    // Setup text layer for highlighting
+    setTimeout(() => {
+      setupTextLayer()
+    }, 150)
+    
+    // Render annotations
+    setTimeout(() => {
+      renderAnnotations()
+    }, 200)
+  }, [currentPage])
 
-  // Apply reading mode styles to the PDF content
+  // Apply reading mode styles - IMPROVED STABILITY
   const applyReadingModeToPdf = useCallback(() => {
-    const pdfPageElement = pdfPageRef.current
-    if (pdfPageElement) {
-      const canvas = pdfPageElement.querySelector("canvas")
-      const textLayer = pdfPageElement.querySelector(".react-pdf__Page__textContent")
+    if (!pdfPageRef.current) return
 
-      if (canvas) {
-        switch (readingMode) {
-          case "dark":
-            canvas.style.filter = "invert(1) hue-rotate(180deg)"
-            canvas.style.backgroundColor = "#1a1a1a"
-            break
-          case "night":
-            canvas.style.filter = "sepia(1) saturate(0.8) hue-rotate(15deg) brightness(0.9)"
-            canvas.style.backgroundColor = "#2d1810"
-            break
-          default:
-            canvas.style.filter = "none"
-            canvas.style.backgroundColor = "#ffffff"
-        }
+    const canvas = pdfPageRef.current.querySelector("canvas")
+    const textLayer = pdfPageRef.current.querySelector(".react-pdf__Page__textContent")
+
+    if (canvas) {
+      // Apply reading mode filters without forcing re-render
+      switch (readingMode) {
+        case "dark":
+          canvas.style.filter = "invert(1) hue-rotate(180deg)"
+          canvas.style.backgroundColor = "#1f2937"
+          break
+        case "night":
+          canvas.style.filter = "sepia(1) saturate(0.8) hue-rotate(15deg) brightness(0.9) contrast(1.1)"
+          canvas.style.backgroundColor = "#451a03"
+          break
+        default:
+          canvas.style.filter = "none"
+          canvas.style.backgroundColor = "#ffffff"
       }
+    }
 
-      if (textLayer) {
-        const textLayerElement = textLayer as HTMLElement
-        const textSpans = textLayer.querySelectorAll("span")
-
-        textSpans.forEach((span) => {
-          span.style.color = "transparent"
-        })
-
-        switch (readingMode) {
-          case "dark":
-            textLayerElement.style.filter = "invert(1)"
-            break
-          case "night":
-            textLayerElement.style.filter = "sepia(1) saturate(0.8) hue-rotate(15deg)"
-            break
-          default:
-            textLayerElement.style.filter = "none"
-        }
+    if (textLayer) {
+      const textLayerElement = textLayer as HTMLElement
+      
+      switch (readingMode) {
+        case "dark":
+          textLayerElement.style.filter = "invert(1)"
+          break
+        case "night":
+          textLayerElement.style.filter = "sepia(1) saturate(0.8) hue-rotate(15deg) brightness(0.9)"
+          break
+        default:
+          textLayerElement.style.filter = "none"
       }
     }
   }, [readingMode])
 
-  // Hide text layer to prevent duplication but keep it for text selection
-  const hideTextLayer = useCallback(() => {
-    if (pdfPageRef.current) {
-      const textLayer = pdfPageRef.current.querySelector('.react-pdf__Page__textContent')
-      if (textLayer) {
-        const textLayerElement = textLayer as HTMLElement
-        // Completely hide the text layer visually but keep it functional
-        textLayerElement.style.opacity = '0'
-        textLayerElement.style.position = 'absolute'
-        textLayerElement.style.top = '0'
-        textLayerElement.style.left = '0'
-        textLayerElement.style.width = '100%'
-        textLayerElement.style.height = '100%'
-        textLayerElement.style.pointerEvents = activeTool === 'highlighter' ? 'auto' : 'none'
-        textLayerElement.style.userSelect = activeTool === 'highlighter' ? 'text' : 'none'
-        textLayerElement.style.zIndex = '10'
-        
-        // Hide all text spans
-        const textSpans = textLayer.querySelectorAll('span')
-        textSpans.forEach((span) => {
-          const spanElement = span as HTMLElement
-          spanElement.style.color = 'transparent'
-          spanElement.style.background = 'transparent'
-        })
-      }
+  // Setup text layer for highlighting - STABLE VERSION
+  const setupTextLayer = useCallback(() => {
+    if (!pdfPageRef.current) return
+
+    const textLayer = pdfPageRef.current.querySelector('.react-pdf__Page__textContent')
+    if (textLayer) {
+      const textLayerElement = textLayer as HTMLElement
+      
+      // Make text layer invisible but functional for text selection
+      textLayerElement.style.opacity = '0'
+      textLayerElement.style.position = 'absolute'
+      textLayerElement.style.top = '0'
+      textLayerElement.style.left = '0'
+      textLayerElement.style.width = '100%'
+      textLayerElement.style.height = '100%'
+      textLayerElement.style.pointerEvents = activeTool === 'highlighter' ? 'auto' : 'none'
+      textLayerElement.style.userSelect = activeTool === 'highlighter' ? 'text' : 'none'
+      textLayerElement.style.zIndex = '10'
+      
+      // Hide all text spans but keep them functional
+      const textSpans = textLayer.querySelectorAll('span')
+      textSpans.forEach((span) => {
+        const spanElement = span as HTMLElement
+        spanElement.style.color = 'transparent'
+        spanElement.style.background = 'transparent'
+      })
     }
   }, [activeTool])
 
@@ -459,15 +444,27 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     }
   }, [activeTool, handleTextSelection])
 
-  // Apply reading mode styles when mode changes
+  // Apply reading mode styles when mode changes - STABLE VERSION
   useEffect(() => {
-    applyReadingModeToPdf()
-  }, [readingMode, currentPage, applyReadingModeToPdf])
+    // Only apply styles if PDF is already rendered
+    if (pdfPageRef.current && pdfPageRef.current.querySelector("canvas")) {
+      console.log(`Applying ${readingMode} mode styles`)
+      
+      // Use requestAnimationFrame for smooth transitions
+      requestAnimationFrame(() => {
+        applyReadingModeToPdf()
+      })
+    }
+  }, [readingMode, applyReadingModeToPdf])
 
-  // Update text layer visibility when tool changes
+  // Update text layer when tool changes
   useEffect(() => {
-    hideTextLayer()
-  }, [activeTool, hideTextLayer, currentPage])
+    if (pdfPageRef.current && pdfPageRef.current.querySelector(".react-pdf__Page__textContent")) {
+      requestAnimationFrame(() => {
+        setupTextLayer()
+      })
+    }
+  }, [activeTool, setupTextLayer])
 
   // Render annotations on overlay canvas
   const renderAnnotations = useCallback(() => {
@@ -482,7 +479,6 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
     const pageRect = pageElement.getBoundingClientRect()
 
-    // Set canvas size to match the PDF page exactly
     canvas.width = pageRect.width
     canvas.height = pageRect.height
     canvas.style.width = pageRect.width + "px"
@@ -613,8 +609,13 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     setCurrentPath([])
   }
 
+  // Re-render annotations when they change
   useEffect(() => {
-    renderAnnotations()
+    if (pdfPageRef.current && pdfPageRef.current.querySelector(".react-pdf__Page")) {
+      requestAnimationFrame(() => {
+        renderAnnotations()
+      })
+    }
   }, [annotations, currentPage, renderAnnotations, scale])
 
   // Handle note save
@@ -792,8 +793,9 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     }
   }
 
-  // Handle reading mode change
+  // Handle reading mode change - STABLE VERSION
   const handleReadingModeChange = (mode: ReadingMode) => {
+    console.log(`Switching to ${mode} mode`)
     saveReadingMode(mode)
   }
 
@@ -1212,7 +1214,6 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                     }
                   >
                     <Page
-                      key={`page_${currentPage}_${scale}_${readingMode}`}
                       pageNumber={currentPage}
                       scale={scale}
                       onRenderSuccess={onPageRenderSuccess}
