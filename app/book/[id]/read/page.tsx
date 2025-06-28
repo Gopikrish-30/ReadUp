@@ -225,9 +225,25 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
   // Handle page render success
   const onPageRenderSuccess = () => {
     console.log(`Page ${currentPage} rendered successfully`)
-    // Small delay to ensure page is fully rendered before adding annotations
-    setTimeout(() => renderAnnotations(), 150)
+    // Delay to ensure page is fully rendered
+    setTimeout(() => {
+      renderAnnotations()
+      hideTextLayer()
+    }, 200)
   }
+
+  // Hide text layer to prevent duplication
+  const hideTextLayer = useCallback(() => {
+    if (pdfPageRef.current) {
+      const textLayer = pdfPageRef.current.querySelector('.react-pdf__Page__textContent')
+      if (textLayer) {
+        const textLayerElement = textLayer as HTMLElement
+        // Make text layer invisible but keep it for text selection
+        textLayerElement.style.opacity = '0'
+        textLayerElement.style.pointerEvents = activeTool === 'highlighter' ? 'auto' : 'none'
+      }
+    }
+  }, [activeTool])
 
   // Calculate scale to fit PDF to screen width
   const calculateFitToScreenScale = useCallback(() => {
@@ -280,12 +296,13 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
       setSelectedText(selectedText)
 
       const rects = Array.from(range.getClientRects()).map((rect) => {
-        const containerRect = pageContainerRef.current?.getBoundingClientRect()
-        if (!containerRect) return { x: 0, y: 0, width: 0, height: 0 }
-
+        const pageElement = pdfPageRef.current?.querySelector('.react-pdf__Page')
+        if (!pageElement) return { x: 0, y: 0, width: 0, height: 0 }
+        
+        const pageRect = pageElement.getBoundingClientRect()
         return {
-          x: rect.left - containerRect.left,
-          y: rect.top - containerRect.top,
+          x: rect.left - pageRect.left,
+          y: rect.top - pageRect.top,
           width: rect.width,
           height: rect.height,
         }
@@ -339,29 +356,29 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     }
   }, [activeTool, handleTextSelection])
 
+  // Update text layer visibility when tool changes
+  useEffect(() => {
+    hideTextLayer()
+  }, [activeTool, hideTextLayer])
+
   // Render annotations on overlay canvas
   const renderAnnotations = useCallback(() => {
-    if (!overlayCanvasRef.current || !pageContainerRef.current) return
+    if (!overlayCanvasRef.current || !pdfPageRef.current) return
 
     const canvas = overlayCanvasRef.current
     const context = canvas.getContext("2d")
     if (!context) return
 
-    const pageElement = pageContainerRef.current.querySelector(".react-pdf__Page")
+    const pageElement = pdfPageRef.current.querySelector(".react-pdf__Page")
     if (!pageElement) return
 
     const pageRect = pageElement.getBoundingClientRect()
-    const containerRect = pageContainerRef.current.getBoundingClientRect()
 
     // Set canvas size to match the PDF page exactly
     canvas.width = pageRect.width
     canvas.height = pageRect.height
     canvas.style.width = pageRect.width + "px"
     canvas.style.height = pageRect.height + "px"
-    
-    // Position canvas to overlay the PDF page
-    canvas.style.left = (pageRect.left - containerRect.left) + "px"
-    canvas.style.top = (pageRect.top - containerRect.top) + "px"
 
     context.clearRect(0, 0, canvas.width, canvas.height)
 
@@ -933,7 +950,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
         {/* PDF Viewer */}
         <div
           ref={containerRef}
-          className="flex-1 bg-white overflow-auto transition-colors duration-300"
+          className="flex-1 bg-gray-50 overflow-auto transition-colors duration-300"
         >
           {pdfError ? (
             <div className="flex items-center justify-center h-full">
@@ -944,7 +961,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
               </div>
             </div>
           ) : pdfUrl ? (
-            <div className="flex justify-center p-4">
+            <div className="flex justify-center p-8">
               <div className="relative" ref={pageContainerRef}>
                 {activeTool === "highlighter" && (
                   <div className="absolute -top-8 left-0 right-0 text-center z-20">
@@ -954,7 +971,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                   </div>
                 )}
 
-                <div ref={pdfPageRef} className="pdf-page-container">
+                <div ref={pdfPageRef} className="relative">
                   <Document
                     file={pdfUrl}
                     onLoadSuccess={onDocumentLoadSuccess}
@@ -975,32 +992,34 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
                       className="shadow-lg border border-gray-200 rounded-lg transition-all duration-300"
                     />
                   </Document>
+
+                  {/* Overlay Canvas positioned absolutely over the PDF */}
+                  <canvas
+                    ref={overlayCanvasRef}
+                    className="absolute top-0 left-0 pointer-events-none"
+                    style={{
+                      pointerEvents: activeTool && activeTool !== "highlighter" ? "auto" : "none",
+                      cursor: activeTool === "eraser" ? "grab" : activeTool === "pen" ? "crosshair" : "default",
+                    }}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                  />
+
+                  {/* Notes positioned absolutely */}
+                  {annotations.notes
+                    .filter((note) => note.page === currentPage)
+                    .map((note) => (
+                      <div
+                        key={note.id}
+                        className="absolute w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold text-white cursor-pointer shadow-lg hover:scale-110 transition-transform z-10"
+                        style={{ left: note.position.x, top: note.position.y }}
+                        title={note.text}
+                      >
+                        📝
+                      </div>
+                    ))}
                 </div>
-
-                <canvas
-                  ref={overlayCanvasRef}
-                  className="absolute pointer-events-none"
-                  style={{
-                    pointerEvents: activeTool && activeTool !== "highlighter" ? "auto" : "none",
-                    cursor: activeTool === "eraser" ? "grab" : activeTool === "pen" ? "crosshair" : "default",
-                  }}
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                />
-
-                {annotations.notes
-                  .filter((note) => note.page === currentPage)
-                  .map((note) => (
-                    <div
-                      key={note.id}
-                      className="absolute w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold text-white cursor-pointer shadow-lg hover:scale-110 transition-transform"
-                      style={{ left: note.position.x, top: note.position.y }}
-                      title={note.text}
-                    >
-                      📝
-                    </div>
-                  ))}
               </div>
             </div>
           ) : (
