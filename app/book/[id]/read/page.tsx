@@ -3,32 +3,43 @@
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Document, Page, pdfjs } from "react-pdf"
+import { motion, AnimatePresence } from "framer-motion"
+import { useHotkeys } from "react-hotkeys-hook"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Separator } from "@/components/ui/separator"
+import { Toolbar, ToolbarButton, ToolbarSeparator, ToolbarToggleGroup, ToolbarToggleItem } from "@/components/ui/toolbar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { usePdfStorage } from "@/hooks/use-pdf-storage"
 import {
-  Highlighter,
-  Eraser,
-  Pencil,
-  StickyNote,
-  BookmarkIcon,
-  Sun,
-  Moon,
-  Lightbulb,
-  BookOpen,
   X,
   ChevronLeft,
   ChevronRight,
-  Save,
-  BrainCircuit,
   ZoomIn,
   ZoomOut,
-  AlertCircle,
+  RotateCw,
+  Download,
+  Search,
+  Bookmark,
+  StickyNote,
+  Highlighter,
+  Edit3,
+  Eraser,
+  Sun,
+  Moon,
+  Eye,
+  Settings,
+  Menu,
+  Maximize,
+  Minimize,
+  MoreHorizontal,
+  FileText,
   Loader2,
+  AlertCircle
 } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { usePdfStorage } from "@/hooks/use-pdf-storage"
 
-// Set up PDF.js worker - use local worker file
+// Set up PDF.js worker
 if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 }
@@ -73,86 +84,86 @@ interface Annotation {
   bookmarks: Bookmark[]
 }
 
-type ReadingMode = "light" | "dark" | "night"
+type ReadingMode = "light" | "dark" | "sepia"
+type ViewMode = "single" | "continuous" | "facing"
+type Tool = "select" | "highlight" | "note" | "draw" | "erase"
 
-export default function FullScreenReadPage({ params }: { params: { id: string } }) {
+export default function ModernPDFReader({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { storage: pdfStorage, isReady } = usePdfStorage()
+  
+  // Refs
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null)
   const pageContainerRef = useRef<HTMLDivElement>(null)
   const pdfPageRef = useRef<HTMLDivElement>(null)
-  const documentRef = useRef<any>(null)
+  const viewerRef = useRef<HTMLDivElement>(null)
 
-  const [activeTool, setActiveTool] = useState<string | null>(null)
-  const [activeColor, setActiveColor] = useState("#ffff00")
-  const [readingMode, setReadingMode] = useState<ReadingMode>("light")
+  // Core state
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
-  const [scale, setScale] = useState(1.0)
-  const [originalScale, setOriginalScale] = useState(1.0)
-  const [fitToScreen, setFitToScreen] = useState(false)
-  const [fitPercentage, setFitPercentage] = useState(90)
-  const [isAddingNote, setIsAddingNote] = useState(false)
-  const [noteText, setNoteText] = useState("")
-  const [notePosition, setNotePosition] = useState({ x: 0, y: 0 })
+  const [scale, setScale] = useState(1.2)
+  const [rotation, setRotation] = useState(0)
+  const [readingMode, setReadingMode] = useState<ReadingMode>("light")
+  const [viewMode, setViewMode] = useState<ViewMode>("single")
+  const [activeTool, setActiveTool] = useState<Tool>("select")
+  
+  // UI state
+  const [isToolbarVisible, setIsToolbarVisible] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  
+  // PDF state
   const [bookData, setBookData] = useState<any>(null)
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-  const [pdfDocument, setPdfDocument] = useState<any>(null)
 
-  // Text selection states
-  const [selectedText, setSelectedText] = useState("")
-
-  // Annotation states
+  // Annotation state
   const [annotations, setAnnotations] = useState<Annotation>({
     highlights: [],
     drawings: [],
     notes: [],
     bookmarks: [],
   })
+  const [selectedText, setSelectedText] = useState("")
+  const [isAddingNote, setIsAddingNote] = useState(false)
+  const [noteText, setNoteText] = useState("")
+  const [notePosition, setNotePosition] = useState({ x: 0, y: 0 })
 
-  // Drawing states
+  // Drawing state
   const [isDrawing, setIsDrawing] = useState(false)
   const [currentPath, setCurrentPath] = useState<Array<{ x: number; y: number }>>([])
+  const [highlightColor, setHighlightColor] = useState("#ffeb3b")
 
-  // Color palette for tools
-  const getColors = () => {
-    switch (readingMode) {
-      case "dark":
-        return [
-          "#ffff00", "#00ff88", "#ff69b4", "#00bfff", 
-          "#ff6b35", "#bb86fc", "#ff5555", "#ffffff"
-        ]
-      case "night":
-        return [
-          "#ffd700", "#90ee90", "#ffb6c1", "#87ceeb", 
-          "#ffa500", "#dda0dd", "#ff6347", "#f5f5dc"
-        ]
-      default:
-        return [
-          "#ffff00", "#00ff00", "#ff69b4", "#00bfff", 
-          "#ff4500", "#9370db", "#ff0000", "#000000"
-        ]
-    }
-  }
-
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  // Load and save reading mode preference
-  useEffect(() => {
-    const savedMode = localStorage.getItem(`readingMode_${params.id}`) as ReadingMode
-    if (savedMode && ["light", "dark", "night"].includes(savedMode)) {
-      setReadingMode(savedMode)
-    }
-  }, [params.id])
-
-  const saveReadingMode = useCallback((mode: ReadingMode) => {
-    console.log(`Switching reading mode to: ${mode}`)
-    setReadingMode(mode)
-    localStorage.setItem(`readingMode_${params.id}`, mode)
-  }, [params.id])
+  // Keyboard shortcuts
+  useHotkeys('ctrl+f', (e) => {
+    e.preventDefault()
+    setIsSearchOpen(true)
+  })
+  
+  useHotkeys('escape', () => {
+    setIsSearchOpen(false)
+    setActiveTool("select")
+  })
+  
+  useHotkeys('ctrl+plus', (e) => {
+    e.preventDefault()
+    handleZoomIn()
+  })
+  
+  useHotkeys('ctrl+minus', (e) => {
+    e.preventDefault()
+    handleZoomOut()
+  })
+  
+  useHotkeys('left', () => handlePreviousPage())
+  useHotkeys('right', () => handleNextPage())
+  useHotkeys('h', () => setActiveTool("highlight"))
+  useHotkeys('n', () => setActiveTool("note"))
+  useHotkeys('d', () => setActiveTool("draw"))
 
   // Load book data and PDF
   useEffect(() => {
@@ -166,8 +177,7 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
         if (book) {
           setBookData(book)
-          console.log("Book data loaded:", book)
-
+          
           const savedAnnotations = localStorage.getItem(`annotations_${params.id}`)
           if (savedAnnotations) {
             setAnnotations(JSON.parse(savedAnnotations))
@@ -180,7 +190,6 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
           try {
             const file = await pdfStorage.getPDF(book.id.toString())
             if (file) {
-              console.log("PDF file loaded from storage:", file.name)
               setPdfFile(file)
               const url = URL.createObjectURL(file)
               setPdfUrl(url)
@@ -212,20 +221,10 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     }
   }, [params.id, isReady, pdfStorage])
 
-  // Save annotations to localStorage
-  const saveAnnotations = useCallback(
-    (newAnnotations: Annotation) => {
-      localStorage.setItem(`annotations_${params.id}`, JSON.stringify(newAnnotations))
-      setAnnotations(newAnnotations)
-    },
-    [params.id],
-  )
-
-  // Handle PDF document load success
+  // PDF document handlers
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setTotalPages(numPages)
-    console.log(`PDF loaded successfully with ${numPages} pages`)
-
+    
     if (bookData && numPages !== bookData.totalPages) {
       const books = JSON.parse(localStorage.getItem("userBooks") || "[]")
       const updatedBooks = books.map((b: any) => {
@@ -238,49 +237,35 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     }
   }
 
-  // Handle PDF document load error
   const onDocumentLoadError = (error: Error) => {
     console.error("Error loading PDF document:", error)
-    setPdfError(`Error loading PDF document: ${error.message}. Please try uploading the PDF again.`)
+    setPdfError(`Error loading PDF document: ${error.message}`)
   }
 
-  // Handle page render success - STABLE VERSION
   const onPageRenderSuccess = useCallback(() => {
-    console.log(`Page ${currentPage} rendered successfully`)
-    
-    // Apply reading mode styles with proper timing
     setTimeout(() => {
-      applyReadingModeToPdf()
-    }, 100)
-    
-    // Setup text layer for highlighting
-    setTimeout(() => {
+      applyReadingMode()
       setupTextLayer()
-    }, 150)
-    
-    // Render annotations
-    setTimeout(() => {
       renderAnnotations()
-    }, 200)
-  }, [currentPage])
+    }, 100)
+  }, [currentPage, readingMode])
 
-  // Apply reading mode styles - IMPROVED STABILITY
-  const applyReadingModeToPdf = useCallback(() => {
+  // Reading mode application
+  const applyReadingMode = useCallback(() => {
     if (!pdfPageRef.current) return
 
     const canvas = pdfPageRef.current.querySelector("canvas")
     const textLayer = pdfPageRef.current.querySelector(".react-pdf__Page__textContent")
 
     if (canvas) {
-      // Apply reading mode filters without forcing re-render
       switch (readingMode) {
         case "dark":
           canvas.style.filter = "invert(1) hue-rotate(180deg)"
-          canvas.style.backgroundColor = "#1f2937"
+          canvas.style.backgroundColor = "#1a1a1a"
           break
-        case "night":
-          canvas.style.filter = "sepia(1) saturate(0.8) hue-rotate(15deg) brightness(0.9) contrast(1.1)"
-          canvas.style.backgroundColor = "#451a03"
+        case "sepia":
+          canvas.style.filter = "sepia(1) saturate(0.8) hue-rotate(15deg) brightness(0.9)"
+          canvas.style.backgroundColor = "#f4f1e8"
           break
         default:
           canvas.style.filter = "none"
@@ -290,13 +275,12 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
     if (textLayer) {
       const textLayerElement = textLayer as HTMLElement
-      
       switch (readingMode) {
         case "dark":
           textLayerElement.style.filter = "invert(1)"
           break
-        case "night":
-          textLayerElement.style.filter = "sepia(1) saturate(0.8) hue-rotate(15deg) brightness(0.9)"
+        case "sepia":
+          textLayerElement.style.filter = "sepia(1) saturate(0.8) hue-rotate(15deg)"
           break
         default:
           textLayerElement.style.filter = "none"
@@ -304,169 +288,26 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     }
   }, [readingMode])
 
-  // Setup text layer for highlighting - STABLE VERSION
+  // Text layer setup
   const setupTextLayer = useCallback(() => {
     if (!pdfPageRef.current) return
 
     const textLayer = pdfPageRef.current.querySelector('.react-pdf__Page__textContent')
     if (textLayer) {
       const textLayerElement = textLayer as HTMLElement
-      
-      // Make text layer invisible but functional for text selection
-      textLayerElement.style.opacity = '0'
+      textLayerElement.style.opacity = activeTool === 'highlight' ? '0' : '0'
       textLayerElement.style.position = 'absolute'
       textLayerElement.style.top = '0'
       textLayerElement.style.left = '0'
       textLayerElement.style.width = '100%'
       textLayerElement.style.height = '100%'
-      textLayerElement.style.pointerEvents = activeTool === 'highlighter' ? 'auto' : 'none'
-      textLayerElement.style.userSelect = activeTool === 'highlighter' ? 'text' : 'none'
+      textLayerElement.style.pointerEvents = activeTool === 'highlight' ? 'auto' : 'none'
+      textLayerElement.style.userSelect = activeTool === 'highlight' ? 'text' : 'none'
       textLayerElement.style.zIndex = '10'
-      
-      // Hide all text spans but keep them functional
-      const textSpans = textLayer.querySelectorAll('span')
-      textSpans.forEach((span) => {
-        const spanElement = span as HTMLElement
-        spanElement.style.color = 'transparent'
-        spanElement.style.background = 'transparent'
-      })
     }
   }, [activeTool])
 
-  // Calculate scale to fit PDF to screen width
-  const calculateFitToScreenScale = useCallback(() => {
-    if (!containerRef.current || !pdfPageRef.current) return scale
-
-    const sidebarWidth = activeTool === "highlighter" || activeTool === "pen" ? 28 : 16
-    const availableWidth = window.innerWidth - sidebarWidth - 80
-
-    const pageElement = pdfPageRef.current.querySelector(".react-pdf__Page")
-    if (!pageElement) return scale
-
-    const pageWidth = (pageElement as HTMLElement).scrollWidth / scale
-    const targetWidth = (availableWidth * fitPercentage) / 100
-    const newScale = targetWidth / pageWidth
-
-    return Math.max(0.5, Math.min(2.5, newScale))
-  }, [scale, fitPercentage, activeTool])
-
-  useEffect(() => {
-    if (fitToScreen && containerRef.current) {
-      const handleResize = () => {
-        const newScale = calculateFitToScreenScale()
-        setScale(newScale)
-      }
-
-      const timeoutId = setTimeout(handleResize, 300)
-      window.addEventListener("resize", handleResize)
-      return () => {
-        clearTimeout(timeoutId)
-        window.removeEventListener("resize", handleResize)
-      }
-    }
-  }, [fitToScreen, calculateFitToScreenScale, currentPage])
-
-  // Handle text selection
-  const handleTextSelection = useCallback(() => {
-    if (activeTool !== "highlighter") return
-
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0) {
-      setSelectedText("")
-      return
-    }
-
-    const range = selection.getRangeAt(0)
-    const selectedText = range.toString().trim()
-
-    if (selectedText && selectedText.length > 0) {
-      console.log("Text selected:", selectedText)
-      setSelectedText(selectedText)
-
-      const rects = Array.from(range.getClientRects()).map((rect) => {
-        const pageElement = pdfPageRef.current?.querySelector('.react-pdf__Page')
-        if (!pageElement) return { x: 0, y: 0, width: 0, height: 0 }
-        
-        const pageRect = pageElement.getBoundingClientRect()
-        return {
-          x: rect.left - pageRect.left,
-          y: rect.top - pageRect.top,
-          width: rect.width,
-          height: rect.height,
-        }
-      })
-
-      if (rects.length > 0) {
-        const newHighlight: TextHighlight = {
-          id: Date.now().toString(),
-          page: currentPage,
-          text: selectedText,
-          color: activeColor,
-          rects: rects,
-          timestamp: Date.now(),
-        }
-
-        const newAnnotations = {
-          ...annotations,
-          highlights: [...annotations.highlights, newHighlight],
-        }
-        saveAnnotations(newAnnotations)
-
-        setTimeout(() => {
-          window.getSelection()?.removeAllRanges()
-          setSelectedText("")
-        }, 200)
-      }
-    }
-  }, [activeTool, currentPage, activeColor, annotations, saveAnnotations])
-
-  // Handle selection events
-  useEffect(() => {
-    const handleSelectionChange = () => {
-      if (activeTool === "highlighter") {
-        const timeoutId = setTimeout(handleTextSelection, 100)
-        return () => clearTimeout(timeoutId)
-      }
-    }
-
-    const handleMouseUp = () => {
-      if (activeTool === "highlighter") {
-        setTimeout(handleTextSelection, 50)
-      }
-    }
-
-    document.addEventListener("selectionchange", handleSelectionChange)
-    document.addEventListener("mouseup", handleMouseUp)
-
-    return () => {
-      document.removeEventListener("selectionchange", handleSelectionChange)
-      document.removeEventListener("mouseup", handleMouseUp)
-    }
-  }, [activeTool, handleTextSelection])
-
-  // Apply reading mode styles when mode changes - STABLE VERSION
-  useEffect(() => {
-    // Only apply styles if PDF is already rendered
-    if (pdfPageRef.current && pdfPageRef.current.querySelector("canvas")) {
-      console.log(`Applying ${readingMode} mode styles`)
-      
-      // Use requestAnimationFrame for smooth transitions
-      requestAnimationFrame(() => {
-        applyReadingModeToPdf()
-      })
-    }
-  }, [readingMode, applyReadingModeToPdf])
-
-  // Update text layer when tool changes
-  useEffect(() => {
-    if (pdfPageRef.current && pdfPageRef.current.querySelector(".react-pdf__Page__textContent")) {
-      requestAnimationFrame(() => {
-        setupTextLayer()
-      })
-    }
-  }, [activeTool, setupTextLayer])
-
-  // Render annotations on overlay canvas
+  // Annotation rendering
   const renderAnnotations = useCallback(() => {
     if (!overlayCanvasRef.current || !pdfPageRef.current) return
 
@@ -478,7 +319,6 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
     if (!pageElement) return
 
     const pageRect = pageElement.getBoundingClientRect()
-
     canvas.width = pageRect.width
     canvas.height = pageRect.height
     canvas.style.width = pageRect.width + "px"
@@ -486,11 +326,11 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
 
     context.clearRect(0, 0, canvas.width, canvas.height)
 
-    // Render text highlights
+    // Render highlights
     annotations.highlights
       .filter((highlight) => highlight.page === currentPage)
       .forEach((highlight) => {
-        context.fillStyle = highlight.color + "80"
+        context.fillStyle = highlight.color + "40"
         highlight.rects.forEach((rect) => {
           context.fillRect(rect.x, rect.y, rect.width, rect.height)
         })
@@ -515,169 +355,46 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
       })
   }, [annotations, currentPage])
 
-  // Handle mouse events for drawing
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!overlayCanvasRef.current || activeTool === "highlighter") return
-
-    const rect = overlayCanvasRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-
-    if (activeTool === "pen") {
-      setIsDrawing(true)
-      setCurrentPath([{ x, y }])
-    } else if (activeTool === "note") {
-      setNotePosition({ x, y })
-      setIsAddingNote(true)
-    } else if (activeTool === "eraser") {
-      const newAnnotations = { ...annotations }
-
-      newAnnotations.highlights = newAnnotations.highlights.filter((highlight) => {
-        if (highlight.page !== currentPage) return true
-        return !highlight.rects.some(
-          (rect) => x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height,
-        )
-      })
-
-      newAnnotations.drawings = newAnnotations.drawings.filter((drawing) => {
-        if (drawing.page !== currentPage) return true
-        return !drawing.paths.some((point) => {
-          const distance = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2)
-          return distance < 20
-        })
-      })
-
-      newAnnotations.notes = newAnnotations.notes.filter((note) => {
-        if (note.page !== currentPage) return true
-        const distance = Math.sqrt((note.position.x - x) ** 2 + (note.position.y - y) ** 2)
-        return distance > 30
-      })
-
-      saveAnnotations(newAnnotations)
+  // Navigation handlers
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1)
+      updateBookProgress(currentPage - 1)
     }
   }
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!overlayCanvasRef.current || !isDrawing || activeTool !== "pen") return
-
-    const rect = overlayCanvasRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-
-    setCurrentPath((prev) => [...prev, { x, y }])
-
-    const context = overlayCanvasRef.current.getContext("2d")
-    if (context && currentPath.length > 0) {
-      context.strokeStyle = activeColor
-      context.lineWidth = 2
-      context.lineCap = "round"
-      context.lineJoin = "round"
-
-      const lastPoint = currentPath[currentPath.length - 1]
-      context.beginPath()
-      context.moveTo(lastPoint.x, lastPoint.y)
-      context.lineTo(x, y)
-      context.stroke()
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1)
+      updateBookProgress(currentPage + 1)
     }
   }
 
-  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!overlayCanvasRef.current || !isDrawing || activeTool !== "pen") return
-
-    const rect = overlayCanvasRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-
-    if (currentPath.length > 1) {
-      const newDrawing: Drawing = {
-        id: Date.now().toString(),
-        page: currentPage,
-        paths: [...currentPath, { x, y }],
-        color: activeColor,
-        lineWidth: 2,
-        timestamp: Date.now(),
-      }
-
-      const newAnnotations = {
-        ...annotations,
-        drawings: [...annotations.drawings, newDrawing],
-      }
-      saveAnnotations(newAnnotations)
+  const handlePageInput = (value: string) => {
+    const pageNum = parseInt(value)
+    if (pageNum >= 1 && pageNum <= totalPages) {
+      setCurrentPage(pageNum)
+      updateBookProgress(pageNum)
     }
-
-    setIsDrawing(false)
-    setCurrentPath([])
   }
 
-  // Re-render annotations when they change
-  useEffect(() => {
-    if (pdfPageRef.current && pdfPageRef.current.querySelector(".react-pdf__Page")) {
-      requestAnimationFrame(() => {
-        renderAnnotations()
-      })
-    }
-  }, [annotations, currentPage, renderAnnotations, scale])
-
-  // Handle note save
-  const handleNoteSave = () => {
-    if (noteText.trim()) {
-      const newNote: Note = {
-        id: Date.now().toString(),
-        text: noteText,
-        position: notePosition,
-        page: currentPage,
-        timestamp: Date.now(),
-      }
-
-      const newAnnotations = {
-        ...annotations,
-        notes: [...annotations.notes, newNote],
-      }
-      saveAnnotations(newAnnotations)
-    }
-    setIsAddingNote(false)
-    setNoteText("")
-    setActiveTool(null)
+  // Zoom handlers
+  const handleZoomIn = () => {
+    setScale(Math.min(scale * 1.2, 3))
   }
 
-  // Handle bookmark
-  const handleBookmarkClick = () => {
-    const newBookmark: Bookmark = {
-      id: Date.now().toString(),
-      page: currentPage,
-      note: `Bookmark on page ${currentPage}`,
-      timestamp: Date.now(),
-    }
-
-    const newAnnotations = {
-      ...annotations,
-      bookmarks: [...annotations.bookmarks, newBookmark],
-    }
-    saveAnnotations(newAnnotations)
-    alert(`Bookmark added on page ${currentPage}`)
+  const handleZoomOut = () => {
+    setScale(Math.max(scale / 1.2, 0.5))
   }
 
-  // Create flashcard from selected text
-  const handleCreateFlashcard = () => {
-    if (selectedText) {
-      const question = `What does this text mean: "${selectedText.substring(0, 50)}${selectedText.length > 50 ? "..." : ""}"`
-      const answer = selectedText
-
-      alert(`Flashcard created!\nQ: ${question}\nA: ${answer}`)
-      window.getSelection()?.removeAllRanges()
-      setSelectedText("")
-    } else {
-      const recentHighlight = annotations.highlights
-        .filter((h) => h.page === currentPage)
-        .sort((a, b) => b.timestamp - a.timestamp)[0]
-
-      if (recentHighlight) {
-        const question = `What does this highlighted text mean: "${recentHighlight.text.substring(0, 50)}${recentHighlight.text.length > 50 ? "..." : ""}"`
-        const answer = recentHighlight.text
-
-        alert(`Flashcard created from highlight!\nQ: ${question}\nA: ${answer}`)
-      } else {
-        alert("Please select some text or create a highlight first to make a flashcard")
+  const handleFitWidth = () => {
+    if (viewerRef.current && pdfPageRef.current) {
+      const viewerWidth = viewerRef.current.clientWidth - 40
+      const pageElement = pdfPageRef.current.querySelector(".react-pdf__Page")
+      if (pageElement) {
+        const pageWidth = (pageElement as HTMLElement).scrollWidth / scale
+        const newScale = viewerWidth / pageWidth
+        setScale(Math.max(0.5, Math.min(3, newScale)))
       }
     }
   }
@@ -696,618 +413,519 @@ export default function FullScreenReadPage({ params }: { params: { id: string } 
         localStorage.setItem("userBooks", JSON.stringify(updatedBooks))
       }
     },
-    [bookData, params.id],
+    [bookData, params.id]
   )
 
-  // Handle page navigation
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
-      setCurrentPage(newPage)
-      updateBookProgress(newPage)
-      window.getSelection()?.removeAllRanges()
-      setSelectedText("")
-    }
-  }
+  // Save annotations
+  const saveAnnotations = useCallback(
+    (newAnnotations: Annotation) => {
+      localStorage.setItem(`annotations_${params.id}`, JSON.stringify(newAnnotations))
+      setAnnotations(newAnnotations)
+    },
+    [params.id]
+  )
 
-  const handleZoomChange = (newScale: number) => {
-    const clampedScale = Math.max(0.5, Math.min(2.5, Math.round(newScale * 10) / 10))
-    if (clampedScale !== scale) {
-      setScale(clampedScale)
-      if (fitToScreen) {
-        setFitToScreen(false)
-      }
-    }
-  }
-
-  const toggleFitToScreen = () => {
-    if (fitToScreen) {
-      setFitToScreen(false)
-      setScale(originalScale)
-    } else {
-      setOriginalScale(scale)
-      setFitToScreen(true)
-      setTimeout(() => {
-        const newScale = calculateFitToScreenScale()
-        setScale(newScale)
-      }, 100)
-    }
-  }
-
-  const handleToolClick = (tool: string) => {
-    if (activeTool === tool) {
-      setActiveTool(null)
-    } else {
-      setActiveTool(tool)
-      setIsAddingNote(false)
-      if (tool !== "highlighter") {
-        window.getSelection()?.removeAllRanges()
-        setSelectedText("")
-      }
-    }
-  }
-
-  // Get container styles based on reading mode
-  const getContainerStyles = () => {
+  // Get theme classes
+  const getThemeClasses = () => {
     switch (readingMode) {
       case "dark":
-        return "bg-gray-900 text-white"
-      case "night":
-        return "bg-amber-950 text-amber-50"
+        return {
+          bg: "bg-gray-900",
+          text: "text-white",
+          toolbar: "bg-gray-800 border-gray-700",
+          button: "hover:bg-gray-700 text-gray-300",
+          input: "bg-gray-700 border-gray-600 text-white"
+        }
+      case "sepia":
+        return {
+          bg: "bg-amber-50",
+          text: "text-amber-900",
+          toolbar: "bg-amber-100 border-amber-200",
+          button: "hover:bg-amber-200 text-amber-800",
+          input: "bg-amber-100 border-amber-300 text-amber-900"
+        }
       default:
-        return "bg-gray-50 text-gray-900"
+        return {
+          bg: "bg-white",
+          text: "text-gray-900",
+          toolbar: "bg-white border-gray-200",
+          button: "hover:bg-gray-100 text-gray-700",
+          input: "bg-white border-gray-300 text-gray-900"
+        }
     }
   }
 
-  // Get card styles based on reading mode
-  const getCardStyles = () => {
-    switch (readingMode) {
-      case "dark":
-        return "bg-gray-800 border-gray-700 text-white"
-      case "night":
-        return "bg-amber-900 border-amber-800 text-amber-50"
-      default:
-        return "bg-white border-gray-200 text-gray-900"
-    }
-  }
+  const theme = getThemeClasses()
 
-  // Get button styles based on reading mode
-  const getButtonStyles = (isActive = false) => {
-    if (isActive) {
-      switch (readingMode) {
-        case "dark":
-          return "bg-blue-600 text-white shadow-md"
-        case "night":
-          return "bg-amber-600 text-white shadow-md"
-        default:
-          return "bg-indigo-600 text-white shadow-md"
-      }
-    }
-    
-    switch (readingMode) {
-      case "dark":
-        return "hover:bg-gray-700 text-gray-300"
-      case "night":
-        return "hover:bg-amber-800 text-amber-200"
-      default:
-        return "hover:bg-gray-100 text-gray-600"
-    }
-  }
-
-  // Handle reading mode change - STABLE VERSION
-  const handleReadingModeChange = (mode: ReadingMode) => {
-    console.log(`Switching to ${mode} mode`)
-    saveReadingMode(mode)
-  }
-
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-
-      switch (e.key) {
-        case "ArrowLeft":
-        case "PageUp":
-          e.preventDefault()
-          handlePageChange(currentPage - 1)
-          break
-        case "ArrowRight":
-        case "PageDown":
-        case " ":
-          e.preventDefault()
-          handlePageChange(currentPage + 1)
-          break
-        case "h":
-          e.preventDefault()
-          handleToolClick("highlighter")
-          break
-        case "p":
-          e.preventDefault()
-          handleToolClick("pen")
-          break
-        case "n":
-          e.preventDefault()
-          handleToolClick("note")
-          break
-        case "e":
-          e.preventDefault()
-          handleToolClick("eraser")
-          break
-        case "1":
-          e.preventDefault()
-          handleReadingModeChange("light")
-          break
-        case "2":
-          e.preventDefault()
-          handleReadingModeChange("dark")
-          break
-        case "3":
-          e.preventDefault()
-          handleReadingModeChange("night")
-          break
-        case "Escape":
-          e.preventDefault()
-          setActiveTool(null)
-          window.getSelection()?.removeAllRanges()
-          break
-        case "f":
-          e.preventDefault()
-          toggleFitToScreen()
-          break
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [currentPage, totalPages, activeTool])
-
-  // Show loading state
   if (!isReady || isLoading) {
     return (
-      <div className={`min-h-screen ${getContainerStyles()} flex items-center justify-center`}>
-        <div className={`text-center ${getCardStyles()} rounded-2xl shadow-lg p-12`}>
-          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <Loader2 className="w-8 h-8 text-white animate-spin" />
-          </div>
-          <h3 className="text-xl font-semibold mb-2">
+      <div className={`min-h-screen ${theme.bg} flex items-center justify-center`}>
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-blue-600" />
+          <p className={`${theme.text} text-lg font-medium`}>
             {!isReady ? "Initializing PDF storage..." : "Loading your book..."}
-          </h3>
-          <p className="opacity-75">Please wait while we prepare your reading experience</p>
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (pdfError) {
+    return (
+      <div className={`min-h-screen ${theme.bg} flex items-center justify-center`}>
+        <div className="text-center max-w-md">
+          <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-500" />
+          <h2 className={`text-xl font-semibold mb-3 ${theme.text}`}>PDF Not Available</h2>
+          <p className={`mb-6 ${theme.text} opacity-75`}>{pdfError}</p>
+          <Button onClick={() => router.back()}>Go Back</Button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={`h-screen ${getContainerStyles()} flex flex-col overflow-hidden transition-colors duration-300`}>
-      {/* Clean Top Bar */}
-      <div className={`${getCardStyles()} border-b px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors duration-300`}>
-        <div className="flex items-center space-x-6">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => router.back()}
-            className={`${getButtonStyles()} rounded-lg transition-colors duration-300`}
-          >
-            <X className="w-5 h-5 mr-2" />
-            Exit Reader
-          </Button>
-
-          {bookData?.title && (
-            <div className="hidden md:flex items-center space-x-3">
-              <div className={`w-2 h-2 rounded-full ${
-                readingMode === "dark" ? "bg-blue-500" : 
-                readingMode === "night" ? "bg-amber-500" : "bg-indigo-600"
-              }`}></div>
-              <span className="text-sm font-medium opacity-75">{bookData.title}</span>
-            </div>
-          )}
-
-          {/* Status Indicators */}
-          <div className="flex items-center space-x-3">
-            {activeTool && (
-              <div className={`flex items-center space-x-2 px-4 py-2 rounded-full text-white ${
-                readingMode === "dark" ? "bg-blue-600" : 
-                readingMode === "night" ? "bg-amber-600" : "bg-indigo-600"
-              }`}>
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-                <span className="text-sm font-medium capitalize">{activeTool} mode</span>
-              </div>
-            )}
-
-            {selectedText && (
-              <div className="flex items-center space-x-2 bg-amber-500 text-white px-4 py-2 rounded-full">
-                <span className="text-sm font-medium">
-                  "{selectedText.substring(0, 25)}{selectedText.length > 25 ? "..." : ""}" selected
-                </span>
-              </div>
-            )}
-
-            {/* Reading mode indicator */}
-            <div className={`flex items-center space-x-2 px-4 py-2 rounded-full ${
-              readingMode === "dark" ? "bg-gray-700 text-gray-300" : 
-              readingMode === "night" ? "bg-amber-800 text-amber-200" : "bg-gray-100 text-gray-700"
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${
-                readingMode === "dark" ? "bg-blue-400" : 
-                readingMode === "night" ? "bg-amber-400" : "bg-yellow-400"
-              }`}></div>
-              <span className="text-sm font-medium capitalize">{readingMode} mode</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-6">
-          {/* Page Navigation */}
-          <div className={`flex items-center space-x-3 ${getCardStyles()} rounded-lg px-4 py-2 border transition-colors duration-300`}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`h-8 w-8 rounded-lg ${getButtonStyles()}`}
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage <= 1}
+    <TooltipProvider>
+      <div className={`h-screen ${theme.bg} flex flex-col transition-colors duration-200`}>
+        {/* Top Toolbar */}
+        <AnimatePresence>
+          {isToolbarVisible && (
+            <motion.div
+              initial={{ y: -100 }}
+              animate={{ y: 0 }}
+              exit={{ y: -100 }}
+              className={`${theme.toolbar} border-b px-4 py-3 flex items-center justify-between shadow-sm`}
             >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
+              {/* Left Section */}
+              <div className="flex items-center space-x-4">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => router.back()}
+                      className={theme.button}
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Close
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Close Reader (Esc)</TooltipContent>
+                </Tooltip>
 
-            <div className="flex items-center space-x-2">
-              <Input
-                type="number"
-                value={currentPage}
-                onChange={(e) => handlePageChange(Number.parseInt(e.target.value) || 1)}
-                className={`w-16 h-8 text-center text-sm rounded-lg border-0 ${
-                  readingMode === "dark" ? "bg-gray-700 text-white" : 
-                  readingMode === "night" ? "bg-amber-800 text-amber-100" : "bg-gray-50"
-                }`}
-                min={1}
-                max={totalPages}
-              />
-              <span className="text-sm font-medium opacity-75">of {totalPages}</span>
-            </div>
+                <Separator orientation="vertical" className="h-6" />
 
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`h-8 w-8 rounded-lg ${getButtonStyles()}`}
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage >= totalPages}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-
-          {/* Zoom Controls */}
-          <div className={`flex items-center space-x-3 ${getCardStyles()} rounded-lg px-4 py-2 border transition-colors duration-300`}>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={`h-8 w-8 rounded-lg ${getButtonStyles()}`}
-              onClick={() => handleZoomChange(scale - 0.1)}
-            >
-              <ZoomOut className="w-4 h-4" />
-            </Button>
-
-            <span className="text-sm font-medium min-w-[3rem] text-center opacity-75">
-              {Math.round(scale * 100)}%
-            </span>
-
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={`h-8 w-8 rounded-lg ${getButtonStyles()}`}
-              onClick={() => handleZoomChange(scale + 0.1)}
-            >
-              <ZoomIn className="w-4 h-4" />
-            </Button>
-
-            <Button
-              variant={fitToScreen ? "default" : "ghost"}
-              size="sm"
-              onClick={toggleFitToScreen}
-              className={`text-xs rounded-lg ${fitToScreen ? getButtonStyles(true) : getButtonStyles()}`}
-            >
-              {fitToScreen ? "Exit Fit" : "Fit Width"}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Clean Floating Sidebar */}
-        <div className="absolute left-6 top-1/2 transform -translate-y-1/2 z-50">
-          <div className={`${getCardStyles()} rounded-2xl shadow-lg border p-3 flex flex-col space-y-3 transition-colors duration-300`}>
-            {/* Tool Buttons */}
-            <Button
-              variant={activeTool === "highlighter" ? "default" : "ghost"}
-              size="icon"
-              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
-                activeTool === "highlighter" ? getButtonStyles(true) : getButtonStyles()
-              }`}
-              onClick={() => handleToolClick("highlighter")}
-              title="Text Highlighter (H)"
-            >
-              <Highlighter className="h-5 w-5" />
-            </Button>
-
-            <Button
-              variant={activeTool === "pen" ? "default" : "ghost"}
-              size="icon"
-              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
-                activeTool === "pen" ? getButtonStyles(true) : getButtonStyles()
-              }`}
-              onClick={() => handleToolClick("pen")}
-              title="Drawing Pen (P)"
-            >
-              <Pencil className="h-5 w-5" />
-            </Button>
-
-            <Button
-              variant={activeTool === "eraser" ? "default" : "ghost"}
-              size="icon"
-              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
-                activeTool === "eraser" ? getButtonStyles(true) : getButtonStyles()
-              }`}
-              onClick={() => handleToolClick("eraser")}
-              title="Eraser (E)"
-            >
-              <Eraser className="h-5 w-5" />
-            </Button>
-
-            <Button
-              variant={activeTool === "note" ? "default" : "ghost"}
-              size="icon"
-              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
-                activeTool === "note" ? getButtonStyles(true) : getButtonStyles()
-              }`}
-              onClick={() => handleToolClick("note")}
-              title="Add Note (N)"
-            >
-              <StickyNote className="h-5 w-5" />
-            </Button>
-
-            {/* Divider */}
-            <div className={`w-8 h-px mx-auto ${
-              readingMode === "dark" ? "bg-gray-600" : 
-              readingMode === "night" ? "bg-amber-700" : "bg-gray-200"
-            }`}></div>
-
-            {/* Action Buttons */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={`w-12 h-12 rounded-xl transition-all duration-200 ${getButtonStyles()}`}
-              onClick={handleBookmarkClick} 
-              title="Bookmark"
-            >
-              <BookmarkIcon className="h-5 w-5" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`w-12 h-12 rounded-xl transition-all duration-200 ${getButtonStyles()}`}
-              onClick={handleCreateFlashcard}
-              title="Create Flashcard"
-            >
-              <BrainCircuit className="h-5 w-5" />
-            </Button>
-
-            {/* Divider */}
-            <div className={`w-8 h-px mx-auto ${
-              readingMode === "dark" ? "bg-gray-600" : 
-              readingMode === "night" ? "bg-amber-700" : "bg-gray-200"
-            }`}></div>
-
-            {/* Reading Mode Buttons */}
-            <Button
-              variant={readingMode === "light" ? "default" : "ghost"}
-              size="icon"
-              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
-                readingMode === "light" ? "bg-yellow-500 text-white" : getButtonStyles()
-              }`}
-              onClick={() => handleReadingModeChange("light")}
-              title="Light Mode (1)"
-            >
-              <Sun className="h-5 w-5" />
-            </Button>
-
-            <Button
-              variant={readingMode === "dark" ? "default" : "ghost"}
-              size="icon"
-              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
-                readingMode === "dark" ? "bg-blue-600 text-white" : getButtonStyles()
-              }`}
-              onClick={() => handleReadingModeChange("dark")}
-              title="Dark Mode (2)"
-            >
-              <Moon className="h-5 w-5" />
-            </Button>
-
-            <Button
-              variant={readingMode === "night" ? "default" : "ghost"}
-              size="icon"
-              className={`w-12 h-12 rounded-xl transition-all duration-200 ${
-                readingMode === "night" ? "bg-amber-600 text-white" : getButtonStyles()
-              }`}
-              onClick={() => handleReadingModeChange("night")}
-              title="Night Light Mode (3) - Reduces Blue Light"
-            >
-              <Lightbulb className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Color Palette */}
-        {(activeTool === "highlighter" || activeTool === "pen") && (
-          <div className="absolute left-24 top-1/2 transform -translate-y-1/2 z-40">
-            <div className={`${getCardStyles()} rounded-2xl shadow-lg border p-3 flex flex-col space-y-3 transition-colors duration-300`}>
-              {getColors().map((color) => (
-                <button
-                  key={color}
-                  className={`w-10 h-10 rounded-xl border-2 transition-all duration-200 ${
-                    activeColor === color
-                      ? `border-gray-800 scale-110 ${readingMode === "dark" ? "border-white" : ""}`
-                      : `border-gray-200 hover:scale-105 hover:border-gray-400 ${
-                          readingMode === "dark" ? "border-gray-600 hover:border-gray-400" : 
-                          readingMode === "night" ? "border-amber-700 hover:border-amber-500" : ""
-                        }`
-                  }`}
-                  style={{ backgroundColor: color }}
-                  onClick={() => setActiveColor(color)}
-                  title={`Select ${color}`}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* PDF Viewer */}
-        <div
-          ref={containerRef}
-          className="flex-1 overflow-auto transition-colors duration-300"
-          style={{ 
-            height: 'calc(100vh - 80px)',
-            maxHeight: 'calc(100vh - 80px)'
-          }}
-        >
-          {pdfError ? (
-            <div className="flex items-center justify-center h-full">
-              <div className={`text-center p-8 max-w-md ${getCardStyles()} rounded-2xl shadow-lg border transition-colors duration-300`}>
-                <div className="w-16 h-16 bg-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <AlertCircle className="w-8 h-8 text-white" />
-                </div>
-                <h2 className="text-xl font-semibold mb-3">PDF Not Available</h2>
-                <p className="opacity-75 mb-6">{pdfError}</p>
-                <Button 
-                  onClick={() => router.back()}
-                  className={`rounded-lg ${getButtonStyles(true)}`}
-                >
-                  Go Back
-                </Button>
-              </div>
-            </div>
-          ) : pdfUrl ? (
-            <div className="flex justify-center py-8 px-6">
-              <div className="relative" ref={pageContainerRef}>
-                {activeTool === "highlighter" && (
-                  <div className="absolute -top-12 left-0 right-0 text-center z-20">
-                    <div className="inline-block bg-amber-500 text-white px-6 py-2 rounded-full text-sm font-medium">
-                      Select text to highlight it
-                    </div>
+                {bookData?.title && (
+                  <div className="hidden md:block">
+                    <h1 className={`font-medium ${theme.text} truncate max-w-xs`}>
+                      {bookData.title}
+                    </h1>
                   </div>
                 )}
+              </div>
 
-                <div ref={pdfPageRef} className="relative">
-                  <Document
-                    file={pdfUrl}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    onLoadError={onDocumentLoadError}
-                    loading={
-                      <div className={`flex items-center justify-center p-12 ${getCardStyles()} rounded-2xl shadow-lg border transition-colors duration-300`}>
-                        <div className="text-center">
-                          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            <Loader2 className="w-8 h-8 text-white animate-spin" />
-                          </div>
-                          <p className="font-medium opacity-75">Loading your book...</p>
+              {/* Center Section - Navigation */}
+              <div className="flex items-center space-x-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handlePreviousPage}
+                      disabled={currentPage <= 1}
+                      className={theme.button}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Previous Page (←)</TooltipContent>
+                </Tooltip>
+
+                <div className="flex items-center space-x-2 px-3 py-1 rounded-md bg-gray-50 dark:bg-gray-800">
+                  <Input
+                    type="number"
+                    value={currentPage}
+                    onChange={(e) => handlePageInput(e.target.value)}
+                    className={`w-16 h-8 text-center text-sm border-0 ${theme.input}`}
+                    min={1}
+                    max={totalPages}
+                  />
+                  <span className={`text-sm ${theme.text} opacity-75`}>of {totalPages}</span>
+                </div>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleNextPage}
+                      disabled={currentPage >= totalPages}
+                      className={theme.button}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Next Page (→)</TooltipContent>
+                </Tooltip>
+              </div>
+
+              {/* Right Section */}
+              <div className="flex items-center space-x-2">
+                {/* Zoom Controls */}
+                <div className="flex items-center space-x-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleZoomOut}
+                        className={theme.button}
+                      >
+                        <ZoomOut className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Zoom Out (Ctrl+-)</TooltipContent>
+                  </Tooltip>
+
+                  <span className={`text-sm font-medium ${theme.text} min-w-[3rem] text-center`}>
+                    {Math.round(scale * 100)}%
+                  </span>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleZoomIn}
+                        className={theme.button}
+                      >
+                        <ZoomIn className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Zoom In (Ctrl++)</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleFitWidth}
+                        className={theme.button}
+                      >
+                        <Maximize className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Fit Width</TooltipContent>
+                  </Tooltip>
+                </div>
+
+                <Separator orientation="vertical" className="h-6" />
+
+                {/* Reading Mode Toggle */}
+                <ToolbarToggleGroup type="single" value={readingMode} onValueChange={(value) => value && setReadingMode(value as ReadingMode)}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToolbarToggleItem value="light" className={theme.button}>
+                        <Sun className="w-4 h-4" />
+                      </ToolbarToggleItem>
+                    </TooltipTrigger>
+                    <TooltipContent>Light Mode</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToolbarToggleItem value="dark" className={theme.button}>
+                        <Moon className="w-4 h-4" />
+                      </ToolbarToggleItem>
+                    </TooltipTrigger>
+                    <TooltipContent>Dark Mode</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToolbarToggleItem value="sepia" className={theme.button}>
+                        <Eye className="w-4 h-4" />
+                      </ToolbarToggleItem>
+                    </TooltipTrigger>
+                    <TooltipContent>Sepia Mode</TooltipContent>
+                  </Tooltip>
+                </ToolbarToggleGroup>
+
+                <Separator orientation="vertical" className="h-6" />
+
+                {/* Tools */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsSearchOpen(true)}
+                      className={theme.button}
+                    >
+                      <Search className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Search (Ctrl+F)</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                      className={theme.button}
+                    >
+                      <Menu className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Toggle Sidebar</TooltipContent>
+                </Tooltip>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Main Content */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar */}
+          <AnimatePresence>
+            {isSidebarOpen && (
+              <motion.div
+                initial={{ x: -300 }}
+                animate={{ x: 0 }}
+                exit={{ x: -300 }}
+                className={`w-80 ${theme.toolbar} border-r flex flex-col`}
+              >
+                <div className="p-4 border-b">
+                  <h3 className={`font-medium ${theme.text}`}>Tools & Annotations</h3>
+                </div>
+
+                {/* Tool Selection */}
+                <div className="p-4 space-y-3">
+                  <ToolbarToggleGroup type="single" value={activeTool} onValueChange={(value) => value && setActiveTool(value as Tool)}>
+                    <div className="grid grid-cols-2 gap-2 w-full">
+                      <ToolbarToggleItem value="select" className={`${theme.button} justify-start`}>
+                        <Edit3 className="w-4 h-4 mr-2" />
+                        Select
+                      </ToolbarToggleItem>
+                      <ToolbarToggleItem value="highlight" className={`${theme.button} justify-start`}>
+                        <Highlighter className="w-4 h-4 mr-2" />
+                        Highlight
+                      </ToolbarToggleItem>
+                      <ToolbarToggleItem value="note" className={`${theme.button} justify-start`}>
+                        <StickyNote className="w-4 h-4 mr-2" />
+                        Note
+                      </ToolbarToggleItem>
+                      <ToolbarToggleItem value="draw" className={`${theme.button} justify-start`}>
+                        <Edit3 className="w-4 h-4 mr-2" />
+                        Draw
+                      </ToolbarToggleItem>
+                    </div>
+                  </ToolbarToggleGroup>
+                </div>
+
+                {/* Annotations List */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  <div className="space-y-4">
+                    {/* Notes */}
+                    {annotations.notes.filter(note => note.page === currentPage).length > 0 && (
+                      <div>
+                        <h4 className={`text-sm font-medium ${theme.text} mb-2`}>Notes on this page</h4>
+                        <div className="space-y-2">
+                          {annotations.notes
+                            .filter(note => note.page === currentPage)
+                            .map(note => (
+                              <div key={note.id} className={`p-2 rounded text-sm ${theme.input}`}>
+                                {note.text}
+                              </div>
+                            ))}
                         </div>
                       </div>
-                    }
-                  >
-                    <Page
-                      pageNumber={currentPage}
-                      scale={scale}
-                      onRenderSuccess={onPageRenderSuccess}
-                      renderTextLayer={true}
-                      renderAnnotationLayer={false}
-                      className={`shadow-lg border rounded-lg overflow-hidden transition-colors duration-300 ${
-                        readingMode === "dark" ? "border-gray-600" : 
-                        readingMode === "night" ? "border-amber-700" : "border-gray-200"
-                      }`}
-                    />
-                  </Document>
+                    )}
 
-                  {/* Overlay Canvas */}
-                  <canvas
-                    ref={overlayCanvasRef}
-                    className="absolute top-0 left-0 pointer-events-none rounded-lg"
-                    style={{
-                      pointerEvents: activeTool && activeTool !== "highlighter" ? "auto" : "none",
-                      cursor: activeTool === "eraser" ? "grab" : activeTool === "pen" ? "crosshair" : "default",
-                    }}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                  />
-
-                  {/* Notes */}
-                  {annotations.notes
-                    .filter((note) => note.page === currentPage)
-                    .map((note) => (
-                      <div
-                        key={note.id}
-                        className="absolute w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-sm font-bold text-white cursor-pointer shadow-lg hover:scale-110 transition-transform z-10 border-2 border-white"
-                        style={{ left: note.position.x, top: note.position.y }}
-                        title={note.text}
-                      >
-                        📝
+                    {/* Highlights */}
+                    {annotations.highlights.filter(highlight => highlight.page === currentPage).length > 0 && (
+                      <div>
+                        <h4 className={`text-sm font-medium ${theme.text} mb-2`}>Highlights on this page</h4>
+                        <div className="space-y-2">
+                          {annotations.highlights
+                            .filter(highlight => highlight.page === currentPage)
+                            .map(highlight => (
+                              <div key={highlight.id} className={`p-2 rounded text-sm ${theme.input}`}>
+                                "{highlight.text.substring(0, 100)}..."
+                              </div>
+                            ))}
+                        </div>
                       </div>
-                    ))}
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className={`text-center ${getCardStyles()} rounded-2xl shadow-lg border p-12 transition-colors duration-300`}>
-                <div className="w-16 h-16 bg-gray-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <BookOpen className="w-8 h-8 text-white" />
-                </div>
-                <h2 className="text-xl font-semibold mb-3">No PDF Loaded</h2>
-                <p className="opacity-75">Please upload a PDF file to start reading</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-      {/* Clean Note Input */}
-      {isAddingNote && (
-        <div
-          className={`absolute ${getCardStyles()} border rounded-2xl shadow-lg w-80 z-50 p-6 transition-colors duration-300`}
-          style={{ left: `${notePosition.x + 100}px`, top: `${notePosition.y + 80}px` }}
-        >
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold mb-2">Add Note</h3>
-            <Textarea
-              className={`w-full h-32 p-4 text-sm rounded-lg resize-none transition-colors duration-300 border-0 ${
-                readingMode === "dark" ? "bg-gray-700 text-white focus:bg-gray-600" : 
-                readingMode === "night" ? "bg-amber-800 text-amber-100 focus:bg-amber-700" : "bg-gray-50 focus:bg-white"
-              }`}
-              placeholder="Write your note here..."
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="flex justify-end space-x-3">
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              onClick={() => setIsAddingNote(false)}
-              className={`rounded-lg ${getButtonStyles()}`}
-            >
-              Cancel
-            </Button>
-            <Button 
-              size="sm" 
-              onClick={handleNoteSave}
-              className={`rounded-lg ${getButtonStyles(true)}`}
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Save Note
-            </Button>
+          {/* PDF Viewer */}
+          <div
+            ref={viewerRef}
+            className="flex-1 overflow-auto"
+            style={{ height: 'calc(100vh - 64px)' }}
+          >
+            {pdfUrl ? (
+              <div className="flex justify-center py-8 px-6">
+                <div className="relative" ref={pageContainerRef}>
+                  <div ref={pdfPageRef} className="relative">
+                    <Document
+                      file={pdfUrl}
+                      onLoadSuccess={onDocumentLoadSuccess}
+                      onLoadError={onDocumentLoadError}
+                      loading={
+                        <div className="flex items-center justify-center p-12">
+                          <div className="text-center">
+                            <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-blue-600" />
+                            <p className={`${theme.text} opacity-75`}>Loading PDF...</p>
+                          </div>
+                        </div>
+                      }
+                    >
+                      <Page
+                        pageNumber={currentPage}
+                        scale={scale}
+                        rotate={rotation}
+                        onRenderSuccess={onPageRenderSuccess}
+                        renderTextLayer={true}
+                        renderAnnotationLayer={false}
+                        className="shadow-lg rounded-lg overflow-hidden"
+                      />
+                    </Document>
+
+                    {/* Overlay Canvas for Annotations */}
+                    <canvas
+                      ref={overlayCanvasRef}
+                      className="absolute top-0 left-0 pointer-events-none rounded-lg"
+                      style={{
+                        pointerEvents: activeTool !== "select" ? "auto" : "none",
+                        cursor: activeTool === "draw" ? "crosshair" : "default",
+                      }}
+                    />
+
+                    {/* Notes Display */}
+                    {annotations.notes
+                      .filter((note) => note.page === currentPage)
+                      .map((note) => (
+                        <div
+                          key={note.id}
+                          className="absolute w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold text-white cursor-pointer shadow-lg hover:scale-110 transition-transform z-10"
+                          style={{ left: note.position.x, top: note.position.y }}
+                          title={note.text}
+                        >
+                          📝
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                  <h2 className={`text-xl font-semibold mb-3 ${theme.text}`}>No PDF Loaded</h2>
+                  <p className={`${theme.text} opacity-75`}>Please upload a PDF file to start reading</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      )}
-    </div>
+
+        {/* Search Overlay */}
+        <AnimatePresence>
+          {isSearchOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute top-16 right-4 z-50"
+            >
+              <div className={`${theme.toolbar} border rounded-lg shadow-lg p-4 w-80`}>
+                <div className="flex items-center space-x-2 mb-3">
+                  <Search className="w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search in document..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={`flex-1 ${theme.input}`}
+                    autoFocus
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsSearchOpen(false)}
+                    className={theme.button}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className={`text-sm ${theme.text} opacity-75`}>
+                  Search functionality coming soon
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Note Input Modal */}
+        <AnimatePresence>
+          {isAddingNote && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            >
+              <motion.div
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.9 }}
+                className={`${theme.toolbar} rounded-lg shadow-xl p-6 w-96`}
+              >
+                <h3 className={`text-lg font-semibold mb-4 ${theme.text}`}>Add Note</h3>
+                <Textarea
+                  placeholder="Write your note here..."
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  className={`w-full h-32 mb-4 ${theme.input}`}
+                  autoFocus
+                />
+                <div className="flex justify-end space-x-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsAddingNote(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={() => {
+                    // Save note logic here
+                    setIsAddingNote(false)
+                    setNoteText("")
+                  }}>
+                    Save Note
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Toolbar Toggle Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsToolbarVisible(!isToolbarVisible)}
+          className="absolute top-2 left-1/2 transform -translate-x-1/2 z-40"
+        >
+          {isToolbarVisible ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+        </Button>
+      </div>
+    </TooltipProvider>
   )
 }
